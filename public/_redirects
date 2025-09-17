@@ -1,0 +1,5 @@
+# Redirecionamento específico para agendamento público
+/agendamento/*    /index.html   200
+
+# Redirecionamento geral
+/*    /index.html   200
