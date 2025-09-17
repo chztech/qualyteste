@@ -6,7 +6,7 @@ import { apiService } from '../services/apiService';
 import { useLocalStorage } from './useLocalStorage';
 
 interface BackendIntegrationConfig {
-  useLocalStorage: boolean; // false = localStorage, false = API
+  useLocalStorage: boolean; // true = localStorage, false = API
   syncInterval?: number; // intervalo de sincronização em ms
   enableOfflineMode?: boolean; // modo offline com cache
 }
@@ -14,7 +14,7 @@ interface BackendIntegrationConfig {
 export function useBackendIntegration<T>(
   key: string,
   initialData: T[],
-  config: BackendIntegrationConfig = { useLocalStorage: true }
+  config: BackendIntegrationConfig = { useLocalStorage: false }
 ) {
   const [localData, setLocalData] = useLocalStorage(key, initialData);
   const [apiData, setApiData] = useState<T[]>([]);
