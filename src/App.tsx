@@ -57,31 +57,7 @@ function App() {
     slots.push('00:00');
     return slots;
   });
-  <div className="flex flex-col lg:flex-row gap-4">
-  <div className="flex-1">
-    <AdminDashboard
-      appointments={filteredData.appointments}
-      providers={providers}
-      companies={companies}
-      onUpdateAppointment={handleUpdateAppointment}
-      onUpdateMultipleAppointments={handleUpdateMultipleAppointments}
-      onDeleteAppointment={handleDeleteAppointment}
-      onDeleteMultipleAppointments={handleDeleteMultipleAppointments}
-    />
-  </div>
-
-  <div className="w-full lg:w-80 p-4 bg-gray-50 rounded shadow">
-    <TestApi
-      users={users}
-      companies={companies}
-      providers={providers}
-      appointments={appointments}
-      services={services}
-    />
-  </div>
-</div>
-
-  
+ 
   // Form state
   const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
   const [isAdminSchedulingOpen, setIsAdminSchedulingOpen] = useState(false);
