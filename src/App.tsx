@@ -23,18 +23,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { mockUsers, mockProviders, mockCompanies, mockAppointments, mockServices } from './data/mockData';
 import { User, ViewMode, Appointment, Provider, Company, Employee, Service } from './types';
 import { Building2, Calendar as CalendarIcon } from 'lucide-react';
-import TestApi from './TestApi';
 
-function App() {
-  return (
-    <div>
-      <h1>Meu App</h1>
-      <TestApi />  {/* Aqui o botão vai aparecer */}
-    </div>
-  );
-}
-
-export default App;
 
 
 function App() {
