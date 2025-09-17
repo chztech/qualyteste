@@ -22,7 +22,7 @@ class ApiService {
   private token: string | null = null;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'https://qualycorpore.chztech.com.br/api';
     this.token = localStorage.getItem('authToken');
   }
 
