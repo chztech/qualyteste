@@ -6,7 +6,7 @@ import { apiService } from '../services/apiService';
 import { useLocalStorage } from './useLocalStorage';
 
 interface BackendIntegrationConfig {
-  useLocalStorage: boolean; // true = localStorage, false = API
+  useLocalStorage: boolean; // false = localStorage, false = API
   syncInterval?: number; // intervalo de sincronização em ms
   enableOfflineMode?: boolean; // modo offline com cache
 }
