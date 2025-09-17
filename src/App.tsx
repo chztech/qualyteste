@@ -777,18 +777,7 @@ function App() {
             onDeleteAppointment={handleDeleteAppointment}
             onDeleteMultipleAppointments={handleDeleteMultipleAppointments}
           />
-          
-        <TestApi
-          users={users}
-          setUsers={setUsers}
-          companies={companies}
-          setCompanies={setCompanies}
-          providers={providers}
-          setProviders={setProviders}
-          appointments={appointments}
-          setAppointments={setAppointments}
-          services={services}
-        />
+       
       
         );
     }
