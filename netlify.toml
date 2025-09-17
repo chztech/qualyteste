@@ -5,6 +5,9 @@
 [build.environment]
   NODE_VERSION = "18"
 
+[context.production.environment]
+  VITE_API_URL = "https://qualycorpore.chztech.com.br/api"
+
 # Redirecionamento específico para agendamento público
 [[redirects]]
   from = "/agendamento/*"
@@ -34,3 +37,10 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
     Pragma = "no-cache"
     Expires = "0"
+    [build]
+  command = "npm run build"
+  publish = "dist"
+
+
+
+
