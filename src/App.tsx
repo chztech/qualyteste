@@ -619,7 +619,22 @@ function App() {
     if (!currentUser) return null;
 
     const filteredData = getFilteredData();
-<div className="w-full lg:w-80">
+// Admin views
+  if (currentUser.role === 'admin') {
+    return (
+      <div className="flex flex-col lg:flex-row gap-4">
+        <div className="flex-1">
+          <AdminDashboard
+            appointments={filteredData.appointments}
+            providers={providers}
+            companies={companies}
+            onUpdateAppointment={handleUpdateAppointment}
+            onUpdateMultipleAppointments={handleUpdateMultipleAppointments}
+            onDeleteAppointment={handleDeleteAppointment}
+            onDeleteMultipleAppointments={handleDeleteMultipleAppointments}
+          />
+        </div>
+        <div className="w-full lg:w-80">
           <TestApi
             users={users}
             setUsers={setUsers}
@@ -632,6 +647,9 @@ function App() {
             services={services}
           />
         </div>
+      </div>
+    );
+  }
     // Company Dashboard
     if (currentUser.role === 'company') {
       const userCompany = companies.find(c => c.id === currentUser.companyId);
