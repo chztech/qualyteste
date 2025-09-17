@@ -619,37 +619,7 @@ function App() {
     if (!currentUser) return null;
 
     const filteredData = getFilteredData();
-// Admin views
-  if (currentUser.role === 'admin') {
-    return (
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="flex-1">
-          <AdminDashboard
-            appointments={filteredData.appointments}
-            providers={providers}
-            companies={companies}
-            onUpdateAppointment={handleUpdateAppointment}
-            onUpdateMultipleAppointments={handleUpdateMultipleAppointments}
-            onDeleteAppointment={handleDeleteAppointment}
-            onDeleteMultipleAppointments={handleDeleteMultipleAppointments}
-          />
-        </div>
-        <div className="w-full lg:w-80">
-          <TestApi
-            users={users}
-            setUsers={setUsers}
-            companies={companies}
-            setCompanies={setCompanies}
-            providers={providers}
-            setProviders={setProviders}
-            appointments={appointments}
-            setAppointments={setAppointments}
-            services={services}
-          />
-        </div>
-      </div>
-    );
-  }
+
     // Company Dashboard
     if (currentUser.role === 'company') {
       const userCompany = companies.find(c => c.id === currentUser.companyId);
@@ -807,6 +777,19 @@ function App() {
             onDeleteAppointment={handleDeleteAppointment}
             onDeleteMultipleAppointments={handleDeleteMultipleAppointments}
           />
+          
+        <TestApi
+          users={users}
+          setUsers={setUsers}
+          companies={companies}
+          setCompanies={setCompanies}
+          providers={providers}
+          setProviders={setProviders}
+          appointments={appointments}
+          setAppointments={setAppointments}
+          services={services}
+        />
+      
         );
     }
   };
