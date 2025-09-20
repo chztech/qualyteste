@@ -3,34 +3,31 @@ import { Eye, EyeOff, User, Lock } from "lucide-react";
 import BrandLogo from "../Layout/BrandLogo";
 import Footer from "../Layout/Footer";
 
-interface LoginFormProps {
-  onLogin?: (email: string, password: string, token: string) => void;
-}
-
-export default function LoginForm({ onLogin }: LoginFormProps) {
+export default function LoginForm() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
+      // PHP normalmente espera dados como form-data
+      const body = new FormData();
+      body.append("email", formData.email);
+      body.append("password", formData.password);
+
       const response = await fetch(
         "https://qualycorpore.chztech.com.br/api/auth/login.php",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-          }),
+          body,
         }
       );
 
@@ -41,21 +38,16 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
       const data = await response.json();
 
       if (data.success) {
-        // Salva token no localStorage
-        localStorage.setItem("token", data.data?.token || "");
-
-        // Callback opcional do onLogin
-        if (onLogin) {
-          onLogin(formData.email, formData.password, data.data?.token || "");
-        }
-
-        alert(`Bem-vindo(a), ${data.data?.user.name}!`);
+        console.log("✅ Login realizado com sucesso:", data);
+        // Aqui você pode salvar token no localStorage e redirecionar
+        localStorage.setItem("token", data.token);
+        // window.location.href = "/dashboard"; // exemplo
       } else {
-        alert(data.error || "Erro no login");
+        throw new Error(data.error || "Credenciais inválidas");
       }
-    } catch (error) {
-      console.error("Erro no login:", error);
-      alert("Não foi possível conectar ao servidor");
+    } catch (err: any) {
+      console.error("Erro no login:", err);
+      setError(err.message || "Erro desconhecido");
     } finally {
       setIsLoading(false);
     }
@@ -127,6 +119,8 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
                   </button>
                 </div>
               </div>
+
+              {error && <p className="text-red-500 text-sm">{error}</p>}
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
                 <label className="flex items-center">
