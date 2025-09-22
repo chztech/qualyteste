@@ -24,6 +24,7 @@ interface CompanyManagementProps {
     company: Partial<Company>
   ) => void | Promise<void>;
   onDeleteCompany: (id: string) => void | Promise<void>;
+  onChangeCompanyPassword: (companyId: string, password: string) => void | Promise<void>;
 }
 
 export default function CompanyManagement({
@@ -31,6 +32,7 @@ export default function CompanyManagement({
   onAddCompany,
   onUpdateCompany,
   onDeleteCompany,
+  onChangeCompanyPassword,
 }: CompanyManagementProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEmployeeFormOpen, setIsEmployeeFormOpen] = useState(false);
@@ -108,26 +110,20 @@ export default function CompanyManagement({
   //ALTERÇÃO DE SENHA
   const handlePasswordChange = async () => {
     if (!selectedCompanyForPassword || !newPassword) {
-      alert("Por favor, digite uma nova senha.");
+      alert('Por favor, digite uma nova senha.');
       return;
     }
 
     try {
-      await onUpdateCompany(selectedCompanyForPassword.id, {});
-      await apiService.updateUser(selectedCompanyForPassword.id, {
-        password: newPassword,
-      });
-      await loadInitialData(currentUser?.role);
-      alert(
-        `Senha alterada com sucesso para ${selectedCompanyForPassword.name}!`
-      );
+      await onChangeCompanyPassword(selectedCompanyForPassword.id, newPassword);
+      alert(`Senha alterada com sucesso para ${selectedCompanyForPassword.name}!`);
     } catch (error) {
-      console.error("Erro ao alterar senha da empresa:", error);
-      alert("Não foi possível alterar a senha. Tente novamente.");
+      console.error('Erro ao alterar senha da empresa:', error);
+      alert('Não foi possível alterar a senha. Tente novamente.');
     } finally {
       setIsPasswordModalOpen(false);
       setSelectedCompanyForPassword(null);
-      setNewPassword("");
+      setNewPassword('');
     }
   };
 
