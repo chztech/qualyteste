@@ -4,9 +4,9 @@ import { Provider } from '../../types';
 
 interface ProviderManagementProps {
   providers: Provider[];
-  onAddProvider: (provider: Omit<Provider, 'id'>) => void;
-  onUpdateProvider: (id: string, provider: Partial<Provider>) => void;
-  onDeleteProvider: (id: string) => void;
+  onAddProvider: (provider: Omit<Provider, 'id'>) => void | Promise<void>;
+  onUpdateProvider: (id: string, provider: Partial<Provider>) => void | Promise<void>;
+  onDeleteProvider: (id: string) => void | Promise<void>;
 }
 
 export default function ProviderManagement({
