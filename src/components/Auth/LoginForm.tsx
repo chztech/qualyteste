@@ -3,7 +3,11 @@ import { Eye, EyeOff, User, Lock } from "lucide-react";
 import BrandLogo from "../Layout/BrandLogo";
 import Footer from "../Layout/Footer";
 
-export default function LoginForm() {
+interface LoginFormProps {
+  onLogin: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+}
+
+export default function LoginForm({ onLogin }: LoginFormProps) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -18,36 +22,15 @@ export default function LoginForm() {
     setError(null);
 
     try {
-      // PHP normalmente espera dados como form-data
-      const body = new FormData();
-      body.append("email", formData.email);
-      body.append("password", formData.password);
+      const result = await onLogin(formData.email, formData.password);
 
-      const response = await fetch(
-        "https://qualycorpore.chztech.com.br/api/auth/login.php",
-        {
-          method: "POST",
-          body,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
+      if (!result?.success) {
+        setError(result?.message || "Credenciais inválidas");
       }
-
-      const data = await response.json();
-
-      if (data.success) {
-        console.log("✅ Login realizado com sucesso:", data);
-        // Aqui você pode salvar token no localStorage e redirecionar
-        localStorage.setItem("token", data.token);
-        // window.location.href = "/dashboard"; // exemplo
-      } else {
-        throw new Error(data.error || "Credenciais inválidas");
-      }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro no login:", err);
-      setError(err.message || "Erro desconhecido");
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
