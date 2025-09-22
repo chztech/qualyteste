@@ -259,12 +259,14 @@ function App() {
         }
 
         console.log("✅ Login realizado com sucesso:", user);
-      } else {
-        alert(response.error || "Falha no login");
+        return { success: true as const };
       }
+
+      const message = response.error || "Falha no login";
+      return { success: false as const, message };
     } catch (error) {
       console.error("❌ Erro no login:", error);
-      alert("Erro de conexão com o servidor");
+      return { success: false as const, message: "Erro de conexão com o servidor" };
     }
   };
 
