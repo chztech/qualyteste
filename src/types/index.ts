@@ -2,75 +2,98 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone?: string | null;
   role: 'admin' | 'client' | 'provider' | 'company';
-  companyId?: string;
-  createdAt: Date;
+  companyId?: string | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Company {
   id: string;
   name: string;
-  address: string;
-  phone: string;
-  email?: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  publicToken?: string | null;
   employees: Employee[];
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Employee {
   id: string;
-  name: string;
-  phone: string;
-  department: string;
   companyId: string;
+  name: string;
+  phone?: string | null;
+  department?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProviderWorkingHours {
+  start: string;
+  end: string;
+  days: number[];
+}
+
+export interface ProviderBreak {
+  id?: string;
+  providerId?: string;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  reason?: string;
 }
 
 export interface Provider {
   id: string;
+  userId?: string | null;
   name: string;
   email: string;
-  phone: string;
+  phone?: string | null;
   specialties: string[];
-  workingHours: {
-    start: string;
-    end: string;
-    days: number[]; // 0-6 (Sun-Sat)
-  };
-  breaks: Break[];
-}
-
-export interface Break {
-  id: string;
-  providerId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  reason: string;
+  workingHours?: ProviderWorkingHours | null;
+  breaks?: ProviderBreak[];
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Service {
   id: string;
   name: string;
-  duration: number; // in minutes
-  description?: string;
-  price?: number;
-  createdAt: Date;
+  duration: number;
+  description?: string | null;
+  price?: number | null;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Appointment {
   id: string;
-  clientId: string;
-  providerId: string;
-  companyId?: string;
-  employeeId?: string;
   date: string;
   startTime: string;
   endTime: string;
-  duration: number; // in minutes
-  service: string;
+  duration: number;
   status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed';
-  notes?: string;
-  createdAt: Date;
+  companyId?: string | null;
+  providerId?: string | null;
+  clientId?: string | null;
+  employeeId?: string | null;
+  serviceId?: string | null;
+  service?: string | null;
+  notes?: string | null;
+  companyName?: string | null;
+  providerName?: string | null;
+  serviceName?: string | null;
+  employeeName?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TimeSlot {
