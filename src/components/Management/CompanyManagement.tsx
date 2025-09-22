@@ -4,9 +4,9 @@ import { Company, Employee } from '../../types';
 
 interface CompanyManagementProps {
   companies: Company[];
-  onAddCompany: (company: Omit<Company, 'id'>) => void;
-  onUpdateCompany: (id: string, company: Partial<Company>) => void;
-  onDeleteCompany: (id: string) => void;
+  onAddCompany: (company: Omit<Company, 'id'>, options?: { password?: string }) => void | Promise<void>;
+  onUpdateCompany: (id: string, company: Partial<Company>) => void | Promise<void>;
+  onDeleteCompany: (id: string) => void | Promise<void>;
 }
 
 export default function CompanyManagement({
@@ -46,21 +46,21 @@ export default function CompanyManagement({
     return password;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (editingCompany) {
-      onUpdateCompany(editingCompany.id, formData);
+      await onUpdateCompany(editingCompany.id, formData);
     } else {
       const password = generatePassword();
-      onAddCompany(formData);
+      await onAddCompany(formData, { password });
       alert(`Empresa cadastrada com sucesso!\n\nDados de acesso:\nEmail: ${formData.email}\nSenha: ${password}\n\nAnote estes dados para fornecer à empresa.`);
     }
     
     resetForm();
   };
 
-  const handleEmployeeSubmit = (e: React.FormEvent) => {
+  const handleEmployeeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (selectedCompany) {
@@ -71,7 +71,7 @@ export default function CompanyManagement({
       };
 
       const updatedEmployees = [...selectedCompany.employees, newEmployee];
-      onUpdateCompany(selectedCompany.id, { employees: updatedEmployees });
+      await onUpdateCompany(selectedCompany.id, { employees: updatedEmployees });
       
       setSelectedCompany({
         ...selectedCompany,
@@ -103,11 +103,11 @@ export default function CompanyManagement({
     setIsPasswordModalOpen(true);
   };
 
-  const handleRemoveEmployee = (companyId: string, employeeId: string) => {
-    const company = companies.find(c => c.id === companyId);
+  const handleRemoveEmployee = async (companyId: string, employeeId: string) => {
+    const company = companies.find((c) => c.id === companyId);
     if (company) {
-      const updatedEmployees = company.employees.filter(emp => emp.id !== employeeId);
-      onUpdateCompany(companyId, { employees: updatedEmployees });
+      const updatedEmployees = company.employees.filter((emp) => emp.id !== employeeId);
+      await onUpdateCompany(companyId, { employees: updatedEmployees });
     }
   };
 
