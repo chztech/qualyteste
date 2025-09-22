@@ -4,9 +4,9 @@ import { Service } from '../../types';
 
 interface ServiceManagementProps {
   services: Service[];
-  onAddService: (service: Omit<Service, 'id' | 'createdAt'>) => void;
-  onUpdateService: (id: string, service: Partial<Service>) => void;
-  onDeleteService: (id: string) => void;
+  onAddService: (service: Omit<Service, 'id' | 'createdAt'>) => void | Promise<void>;
+  onUpdateService: (id: string, service: Partial<Service>) => void | Promise<void>;
+  onDeleteService: (id: string) => void | Promise<void>;
 }
 
 export default function ServiceManagement({
