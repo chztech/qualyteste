@@ -19,15 +19,6 @@ import ProviderDashboard from "./components/Provider/ProviderDashboard";
 import PublicBooking from "./components/Company/PublicBooking";
 import LoginForm from "./components/Auth/LoginForm";
 import apiService from "./services/apiService";
-import { logoConfigService } from "./services/logoConfigService";
-import { useLocalStorage } from "./hooks/useLocalStorage";
-import {
-  mockUsers,
-  mockProviders,
-  mockCompanies,
-  mockAppointments,
-  mockServices,
-} from "./data/mockData";
 import {
   User,
   ViewMode,
@@ -51,14 +42,80 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("month");
 
   // Data state
-  const [users, setUsers] = useLocalStorage("users", mockUsers);
-  const [appointments, setAppointments] = useLocalStorage(
-    "appointments",
-    mockAppointments
+  const [users, setUsers] = useState<User[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  const generateId = React.useCallback(() => (
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Date.now().toString()
+  ), []);
+
+  const loadInitialData = React.useCallback(
+    async (roleOverride?: User['role']) => {
+      setIsBootstrapping(true);
+      setDataError(null);
+      try {
+        const effectiveRole = roleOverride ?? currentUser?.role;
+
+        const [companiesRes, providersRes, servicesRes, appointmentsRes, usersRes] =
+          await Promise.all([
+            apiService.getCompanies(),
+            apiService.getProviders(),
+            apiService.getServices(),
+            apiService.getAppointments(),
+            effectiveRole === 'admin'
+              ? apiService.getUsers()
+              : Promise.resolve({ success: true, data: [] }),
+          ]);
+
+        if (companiesRes.success && companiesRes.data) {
+          setCompanies(companiesRes.data);
+        } else {
+          setCompanies([]);
+        }
+
+        if (providersRes.success && providersRes.data) {
+          setProviders(providersRes.data);
+        } else {
+          setProviders([]);
+        }
+
+        if (servicesRes.success && servicesRes.data) {
+          setServices(servicesRes.data);
+        } else {
+          setServices([]);
+        }
+
+        if (appointmentsRes.success && appointmentsRes.data) {
+          setAppointments(appointmentsRes.data);
+        } else {
+          setAppointments([]);
+        }
+
+        if (effectiveRole === 'admin') {
+          if (usersRes.success && usersRes.data) {
+            setUsers(usersRes.data as User[]);
+          } else {
+            setUsers([]);
+          }
+        } else {
+          setUsers([]);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados iniciais:', error);
+        setDataError('Não foi possível carregar os dados do sistema.');
+      } finally {
+        setIsBootstrapping(false);
+      }
+    },
+    [currentUser?.role]
   );
-  const [providers, setProviders] = useLocalStorage("providers", mockProviders);
-  const [companies, setCompanies] = useLocalStorage("companies", mockCompanies);
-  const [services, setServices] = useLocalStorage("services", mockServices);
 
   // System settings - Simplified time slots
   const [availableTimeSlots] = useState(() => {
@@ -82,32 +139,6 @@ function App() {
     useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-
-  // 🎯 SISTEMA: Atualização automática silenciosa
-  React.useEffect(() => {
-    const checkForUpdates = () => {
-      const storedAppointments = localStorage.getItem("appointments");
-      if (storedAppointments) {
-        try {
-          const parsedAppointments = JSON.parse(storedAppointments);
-
-          // Verificar se há mudanças nos dados
-          if (
-            JSON.stringify(parsedAppointments) !== JSON.stringify(appointments)
-          ) {
-            setAppointments(parsedAppointments);
-          }
-        } catch (error) {
-          console.error("Erro ao verificar atualizações:", error);
-        }
-      }
-    };
-
-    // Verificar atualizações a cada 5 segundos
-    const interval = setInterval(checkForUpdates, 5000);
-
-    return () => clearInterval(interval);
-  }, [appointments]);
 
   // Utility functions
   const calculateEndTime = (startTime: string, duration: number) => {
@@ -173,64 +204,66 @@ function App() {
   };
 
   // Employee management functions for companies
-  const handleAddEmployee = (employeeData: Omit<Employee, "id">) => {
+  const handleAddEmployee = async (employeeData: Omit<Employee, 'id'>) => {
+    const company = companies.find((item) => item.id === employeeData.companyId);
+    if (!company) return;
+
     const newEmployee: Employee = {
       ...employeeData,
-      id: Date.now().toString(),
+      id: generateId(),
     };
 
-    setCompanies((prev) => {
-      const updatedCompanies = prev.map((company) =>
-        company.id === employeeData.companyId
-          ? { ...company, employees: [...company.employees, newEmployee] }
-          : company
-      );
-
-      // Salvar no localStorage para persistência
-      localStorage.setItem("companies", JSON.stringify(updatedCompanies));
-
-      return updatedCompanies;
-    });
-
-    console.log("✅ Funcionário adicionado:", newEmployee);
+    try {
+      await apiService.updateCompany(employeeData.companyId, {
+        employees: [...company.employees, newEmployee],
+      });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao adicionar colaborador:', error);
+      alert('Não foi possível adicionar o colaborador. Tente novamente.');
+    }
   };
 
-  const handleUpdateEmployee = (
+  const handleUpdateEmployee = async (
     id: string,
     employeeData: Partial<Employee>
   ) => {
-    setCompanies((prev) => {
-      const updatedCompanies = prev.map((company) => ({
-        ...company,
-        employees: company.employees.map((emp) =>
-          emp.id === id ? { ...emp, ...employeeData } : emp
-        ),
-      }));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
+    if (!company) return;
 
-      // Salvar no localStorage para persistência
-      localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+    const updatedEmployees = company.employees.map((employee) =>
+      employee.id === id ? { ...employee, ...employeeData } : employee
+    );
 
-      return updatedCompanies;
-    });
-
-    console.log("✅ Funcionário atualizado:", id, employeeData);
+    try {
+      await apiService.updateCompany(company.id, { employees: updatedEmployees });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar colaborador:', error);
+      alert('Não foi possível atualizar o colaborador. Tente novamente.');
+    }
   };
 
-  const handleDeleteEmployee = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este colaborador?")) {
-      setCompanies((prev) => {
-        const updatedCompanies = prev.map((company) => ({
-          ...company,
-          employees: company.employees.filter((emp) => emp.id !== id),
-        }));
+  const handleDeleteEmployee = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este colaborador?')) {
+      return;
+    }
 
-        // Salvar no localStorage para persistência
-        localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
+    if (!company) return;
 
-        return updatedCompanies;
-      });
+    const updatedEmployees = company.employees.filter((employee) => employee.id !== id);
 
-      console.log("✅ Funcionário excluído:", id);
+    try {
+      await apiService.updateCompany(company.id, { employees: updatedEmployees });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir colaborador:', error);
+      alert('Não foi possível excluir o colaborador. Tente novamente.');
     }
   };
 
@@ -242,38 +275,50 @@ function App() {
       if (response.success && response.data) {
         const { user, token } = response.data;
 
-        // Salva o token no ApiService (para futuras requisições)
         apiService.setAuthToken(token);
+        await loadInitialData(user.role);
 
-        // Atualiza o estado global
-        setCurrentUser(user);
+        const mappedUser: User = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone ?? null,
+          role: user.role,
+          companyId: user.companyId ?? user.company_id ?? null,
+        };
+
+        setCurrentUser(mappedUser);
         setIsAuthenticated(true);
 
-        // Direciona conforme o tipo de usuário
-        if (user.role === "company") {
-          setActiveTab("dashboard");
-        } else if (user.role === "provider") {
-          setActiveTab("my-schedule");
+        if (mappedUser.role === 'company') {
+          setActiveTab('dashboard');
+        } else if (mappedUser.role === 'provider') {
+          setActiveTab('my-schedule');
         } else {
-          setActiveTab("calendar");
+          setActiveTab('calendar');
         }
 
-        console.log("✅ Login realizado com sucesso:", user);
         return { success: true as const };
       }
 
-      const message = response.error || "Falha no login";
+      const message = response.error || 'Falha no login';
       return { success: false as const, message };
     } catch (error) {
-      console.error("❌ Erro no login:", error);
-      return { success: false as const, message: "Erro de conexão com o servidor" };
+      console.error('❌ Erro no login:', error);
+      return { success: false as const, message: 'Erro de conexão com o servidor' };
     }
   };
 
   const handleLogout = () => {
+    apiService.clearAuthToken();
     setCurrentUser(null);
     setIsAuthenticated(false);
-    setActiveTab("calendar");
+    setActiveTab('calendar');
+    setCompanies([]);
+    setProviders([]);
+    setServices([]);
+    setAppointments([]);
+    setUsers([]);
   };
 
   const handleDateClick = (date: Date) => {
@@ -324,221 +369,229 @@ function App() {
     setIsAppointmentFormOpen(true);
   };
 
-  const handleAppointmentSubmit = (
-    appointmentData: Omit<Appointment, "id" | "createdAt">
+  const handleAppointmentSubmit = async (
+    appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
-    if (selectedAppointment) {
-      setAppointments((prev) =>
-        prev.map((apt) =>
-          apt.id === selectedAppointment.id
-            ? {
-                ...appointmentData,
-                id: selectedAppointment.id,
-                createdAt: selectedAppointment.createdAt,
-              }
-            : apt
-        )
-      );
-    } else {
-      const newAppointment: Appointment = {
-        ...appointmentData,
-        id: Date.now().toString(),
-        createdAt: new Date(),
-      };
-      setAppointments((prev) => [...prev, newAppointment]);
-    }
+    try {
+      if (selectedAppointment) {
+        await apiService.updateAppointment(selectedAppointment.id, appointmentData);
+      } else {
+        await apiService.createAppointment({
+          companyId: appointmentData.companyId,
+          providerId: appointmentData.providerId,
+          clientId: appointmentData.clientId,
+          employeeId: appointmentData.employeeId ?? null,
+          serviceId: appointmentData.serviceId,
+          date: appointmentData.date,
+          startTime: appointmentData.startTime,
+          endTime: appointmentData.endTime,
+          duration: appointmentData.duration,
+          status: appointmentData.status,
+          notes: appointmentData.notes ?? null,
+        });
+      }
 
-    setSelectedAppointment(null);
-    setSelectedDate(null);
-    setSelectedTime(null);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao salvar agendamento:', error);
+      alert('Não foi possível salvar o agendamento. Tente novamente.');
+    } finally {
+      setSelectedAppointment(null);
+      setSelectedDate(null);
+      setSelectedTime(null);
+    }
   };
 
-  const handleUpdateAppointment = (
+  const handleUpdateAppointment = async (
     id: string,
     appointmentData: Partial<Appointment>
   ) => {
-    setAppointments((prev) =>
-      prev.map((apt) => (apt.id === id ? { ...apt, ...appointmentData } : apt))
-    );
+    try {
+      await apiService.updateAppointment(id, appointmentData);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar agendamento:', error);
+      alert('Não foi possível atualizar o agendamento. Tente novamente.');
+    }
   };
 
-  const handleDeleteAppointment = (id: string) => {
-    setAppointments((prev) => {
-      const updatedAppointments = prev.filter((apt) => apt.id !== id);
-
-      // Salvar no localStorage para sincronização
-      localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-
-      return updatedAppointments;
-    });
+  const handleDeleteAppointment = async (id: string) => {
+    try {
+      await apiService.deleteAppointments([id]);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir agendamento:', error);
+      alert('Não foi possível excluir o agendamento. Tente novamente.');
+    }
   };
 
   // 🎯 NOVA FUNÇÃO: Atualizar múltiplos agendamentos de uma vez
-  const handleUpdateMultipleAppointments = (
+  const handleUpdateMultipleAppointments = async (
     appointmentIds: string[],
     updateData: Partial<Appointment>
   ) => {
-    setAppointments((prev) => {
-      const updatedAppointments = prev.map((apt) =>
-        appointmentIds.includes(apt.id) ? { ...apt, ...updateData } : apt
+    try {
+      await Promise.all(
+        appointmentIds.map((id) => apiService.updateAppointment(id, updateData))
       );
-
-      // Salvar no localStorage para sincronização
-      localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-
-      return updatedAppointments;
-    });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar agendamentos:', error);
+      alert('Não foi possível atualizar os agendamentos selecionados.');
+    }
   };
 
   // 🎯 NOVA FUNÇÃO: Excluir múltiplos agendamentos de uma vez
-  const handleDeleteMultipleAppointments = (appointmentIds: string[]) => {
-    setAppointments((prev) => {
-      const updatedAppointments = prev.filter(
-        (apt) => !appointmentIds.includes(apt.id)
-      );
+  const handleDeleteMultipleAppointments = async (appointmentIds: string[]) => {
+    if (appointmentIds.length === 0) return;
 
-      // Salvar no localStorage para sincronização
-      localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-
-      return updatedAppointments;
-    });
+    try {
+      await apiService.deleteAppointments(appointmentIds);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir agendamentos:', error);
+      alert('Não foi possível excluir os agendamentos selecionados.');
+    }
   };
 
-  const handleAdminSchedulingSubmit = (scheduleData: any) => {
+  const handleAdminSchedulingSubmit = async (scheduleData: any) => {
     const { companyId, date, slots, chairs } = scheduleData;
 
-    console.log("🔍 Recebendo dados do agendamento:", scheduleData);
+    try {
+      await Promise.all(
+        slots.map(async (slot: any) => {
+          const endTime = calculateEndTime(slot.time, slot.duration);
+          const providerName = providers.find((p) => p.id === slot.providerId)?.name;
+          const service = services.find((s) => s.id === slot.serviceId);
 
-    // Criar um appointment para cada slot (cada cadeira em cada horário)
-    const newAppointments = slots.map((slot: any, index: number) => {
-      const service = services.find((s) => s.id === slot.serviceId);
-      const endTime = calculateEndTime(slot.time, slot.duration);
-
-      return {
-        id: `${Date.now()}-${index}-${slot.time}-${slot.chair}`,
-        clientId: companyId,
-        providerId: slot.providerId,
-        companyId: companyId,
-        employeeId: "", // Será preenchido quando o colaborador agendar
-        date: date,
-        startTime: slot.time,
-        endTime: endTime,
-        duration: slot.duration,
-        service: service?.name || "",
-        status: "scheduled" as const,
-        notes: `Agendamento administrativo - Cadeira ${
-          slot.chair
-        }/${chairs} - Prestador: ${
-          providers.find((p) => p.id === slot.providerId)?.name
-        }`,
-        createdAt: new Date(),
-      };
-    });
-
-    console.log("🔍 Novos agendamentos criados:", newAppointments);
-
-    setAppointments((prev) => [...prev, ...newAppointments]);
-
-    // Salvar no localStorage para persistência
-    const updatedAppointments = [...appointments, ...newAppointments];
-    localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-
-    console.log("✅ Agendamentos salvos no localStorage");
+          await apiService.createAppointment({
+            companyId,
+            providerId: slot.providerId,
+            serviceId: slot.serviceId,
+            clientId: companyId,
+            employeeId: null,
+            date,
+            startTime: slot.time,
+            endTime,
+            duration: slot.duration,
+            status: 'scheduled',
+            notes: `Agendamento administrativo - Cadeira ${slot.chair}/${chairs}` +
+              (providerName ? ` - Prestador: ${providerName}` : '') +
+              (service ? ` - Serviço: ${service.name}` : ''),
+          });
+        })
+      );
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao criar agendamentos:', error);
+      alert('Não foi possível criar os agendamentos. Tente novamente.');
+    }
   };
 
-  // 🎯 FUNÇÃO: Handle company booking (update existing appointment instead of creating new)
-  const handleCompanyBookAppointment = (
-    appointmentData: Omit<Appointment, "id" | "createdAt">
+  // 🎯 FUNÇÃO: Handle company booking (update existing appointment em backend)
+  const handleCompanyBookAppointment = async (
+    appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
-    // Buscar o slot existente que corresponde aos dados
-    const existingSlot = appointments.find(
-      (apt) =>
-        apt.companyId === appointmentData.companyId &&
-        apt.date === appointmentData.date &&
-        apt.startTime === appointmentData.startTime &&
-        apt.service === appointmentData.service &&
-        (!apt.employeeId || apt.employeeId === "") // Slot ainda não ocupado
-    );
+    try {
+      const existingSlot = appointments.find((apt) => {
+        const sameService = appointmentData.serviceId
+          ? apt.serviceId === appointmentData.serviceId
+          : apt.service === appointmentData.service;
 
-    if (existingSlot) {
-      // Atualizar o slot existente com o employeeId
-      setAppointments((prev) =>
-        prev.map((apt) =>
-          apt.id === existingSlot.id
-            ? {
-                ...apt,
-                employeeId: appointmentData.employeeId,
-                notes: appointmentData.notes,
-                status: appointmentData.status,
-              }
-            : apt
-        )
-      );
-    } else {
-      // Fallback: criar novo appointment se não encontrar slot
-      const newAppointment: Appointment = {
-        ...appointmentData,
-        id: Date.now().toString(),
-        createdAt: new Date(),
-      };
-      setAppointments((prev) => [...prev, newAppointment]);
+        return (
+          apt.companyId === appointmentData.companyId &&
+          apt.date === appointmentData.date &&
+          apt.startTime === appointmentData.startTime &&
+          sameService &&
+          (!apt.employeeId || apt.employeeId === '')
+        );
+      });
+
+      if (existingSlot) {
+        await apiService.updateAppointment(existingSlot.id, {
+          employeeId: appointmentData.employeeId ?? null,
+          notes: appointmentData.notes,
+          status: appointmentData.status,
+        });
+      } else {
+        await apiService.createAppointment({
+          companyId: appointmentData.companyId,
+          providerId: appointmentData.providerId,
+          clientId: appointmentData.clientId,
+          employeeId: appointmentData.employeeId ?? null,
+          serviceId: appointmentData.serviceId,
+          date: appointmentData.date,
+          startTime: appointmentData.startTime,
+          endTime: appointmentData.endTime,
+          duration: appointmentData.duration,
+          status: appointmentData.status,
+          notes: appointmentData.notes,
+        });
+      }
+
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao registrar agendamento da empresa:', error);
+      alert('Não foi possível registrar o agendamento. Tente novamente.');
     }
   };
 
   // 🎯 NOVA FUNÇÃO: Handle public booking (atualizar slot existente)
-  const handlePublicBookAppointment = (appointmentData: any) => {
-    // appointmentData contém: { id, employeeId, notes }
-    setAppointments((prev) => {
-      const updatedAppointments = prev.map((apt) =>
-        apt.id === appointmentData.id
-          ? {
-              ...apt,
-              employeeId: appointmentData.employeeId,
-              notes: appointmentData.notes,
-              status: "confirmed" as const, // Confirmar automaticamente agendamentos públicos
-            }
-          : apt
+  const handlePublicBookAppointment = async (appointmentData: {
+    id: string;
+    employeeId?: string;
+    notes?: string;
+  }) => {
+    try {
+      await apiService.updateAppointment(appointmentData.id, {
+        employeeId: appointmentData.employeeId ?? null,
+        notes: appointmentData.notes,
+        status: 'confirmed',
+      });
+
+      await loadInitialData();
+
+      alert(
+        '✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa.'
       );
-
-      // Salvar no localStorage para sincronização
-      localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
-
-      return updatedAppointments;
-    });
-
-    alert(
-      "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa."
-    );
+    } catch (error) {
+      console.error('Erro ao confirmar agendamento público:', error);
+      alert('Não foi possível confirmar o agendamento. Tente novamente.');
+    }
   };
 
   // 🎯 NOVA FUNÇÃO: Handle add employee from public booking
-  const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, "id">) => {
+  const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, 'id'>) => {
+    const company = companies.find((item) => item.id === employeeData.companyId);
+    if (!company) {
+      alert('Empresa não encontrada para associar o colaborador.');
+      return '';
+    }
+
     const newEmployee: Employee = {
       ...employeeData,
-      id: Date.now().toString(),
+      id: generateId(),
     };
 
-    // Adicionar à lista de colaboradores da empresa
     setCompanies((prev) =>
-      prev.map((company) =>
-        company.id === employeeData.companyId
-          ? { ...company, employees: [...company.employees, newEmployee] }
-          : company
+      prev.map((item) =>
+        item.id === company.id
+          ? { ...item, employees: [...item.employees, newEmployee] }
+          : item
       )
     );
 
-    // Salvar no localStorage para persistência
-    const updatedCompanies = companies.map((company) =>
-      company.id === employeeData.companyId
-        ? { ...company, employees: [...company.employees, newEmployee] }
-        : company
-    );
-    localStorage.setItem("companies", JSON.stringify(updatedCompanies));
+    apiService
+      .updateCompany(company.id, {
+        employees: [...company.employees, newEmployee],
+      })
+      .then(() => loadInitialData(currentUser?.role))
+      .catch((error) => {
+        console.error('Erro ao adicionar colaborador público:', error);
+        alert('Não foi possível adicionar o colaborador. Tente novamente.');
+        loadInitialData(currentUser?.role);
+      });
 
-    console.log(
-      "✅ Novo colaborador adicionado via link público:",
-      newEmployee
-    );
     return newEmployee.id;
   };
   // 🎯 NOVA LÓGICA: Renderizar página pública de agendamento
@@ -561,133 +614,197 @@ function App() {
   }
 
   // Provider management functions
-  const handleAddProvider = (providerData: Omit<Provider, "id">) => {
-    const newProvider: Provider = {
-      ...providerData,
-      id: Date.now().toString(),
-    };
-    setProviders((prev) => [...prev, newProvider]);
-
-    const newUser: User = {
-      id: newProvider.id,
-      name: providerData.name,
-      email: providerData.email,
-      phone: providerData.phone,
-      role: "provider",
-      createdAt: new Date(),
-    };
-    setUsers((prev) => [...prev, newUser]);
+  const handleAddProvider = async (providerData: Omit<Provider, 'id'>) => {
+    try {
+      await apiService.createProvider({
+        name: providerData.name,
+        email: providerData.email,
+        phone: providerData.phone ?? undefined,
+        specialties: providerData.specialties ?? [],
+        workingHours: providerData.workingHours ?? null,
+        breaks: providerData.breaks ?? [],
+        createUser: true,
+      });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao cadastrar prestador:', error);
+      alert('Não foi possível cadastrar o prestador. Tente novamente.');
+    }
   };
 
-  const handleUpdateProvider = (
+  const handleUpdateProvider = async (
     id: string,
     providerData: Partial<Provider>
   ) => {
-    setProviders((prev) =>
-      prev.map((provider) =>
-        provider.id === id ? { ...provider, ...providerData } : provider
-      )
-    );
-
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === id
-          ? {
-              ...user,
-              name: providerData.name || user.name,
-              email: providerData.email || user.email,
-              phone: providerData.phone || user.phone,
-            }
-          : user
-      )
-    );
+    try {
+      await apiService.updateProvider(id, providerData);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar prestador:', error);
+      alert('Não foi possível atualizar o prestador. Tente novamente.');
+    }
   };
 
-  const handleDeleteProvider = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este prestador?")) {
-      setProviders((prev) => prev.filter((provider) => provider.id !== id));
-      setUsers((prev) => prev.filter((user) => user.id !== id));
+  const handleDeleteProvider = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este prestador?')) {
+      return;
+    }
+
+    try {
+      await apiService.updateProvider(id, { isActive: false });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir prestador:', error);
+      alert('Não foi possível excluir o prestador. Tente novamente.');
     }
   };
 
   // Company management functions
-  const handleAddCompany = (companyData: Omit<Company, "id">) => {
-    const newCompany: Company = {
-      ...companyData,
-      id: Date.now().toString(),
-    };
-    setCompanies((prev) => [...prev, newCompany]);
+  const handleAddCompany = async (
+    companyData: Omit<Company, 'id'>,
+    options?: { password?: string }
+  ) => {
+    try {
+      const createResponse = await apiService.createCompany({
+        name: companyData.name,
+        address: companyData.address ?? undefined,
+        phone: companyData.phone ?? undefined,
+        email: companyData.email ?? undefined,
+        notes: companyData.notes ?? undefined,
+        employees: companyData.employees?.map((employee) => ({
+          name: employee.name,
+          phone: employee.phone ?? undefined,
+          department: employee.department ?? undefined,
+        })),
+      });
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: companyData.name,
-      email: companyData.email || "",
-      phone: companyData.phone,
-      role: "company",
-      companyId: newCompany.id,
-      createdAt: new Date(),
-    };
-    setUsers((prev) => [...prev, newUser]);
+      if (!createResponse.success || !createResponse.data) {
+        throw new Error(createResponse.error || 'Erro ao salvar empresa');
+      }
+
+      const createdCompany = createResponse.data;
+
+      if (companyData.email && options?.password) {
+        await apiService.createUser({
+          name: companyData.name,
+          email: companyData.email,
+          phone: companyData.phone ?? undefined,
+          password: options.password,
+          role: 'company',
+          companyId: createdCompany.id,
+        });
+      }
+
+      await loadInitialData(currentUser?.role);
+    } catch (error) {
+      console.error('Erro ao cadastrar empresa:', error);
+      alert('Não foi possível cadastrar a empresa. Tente novamente.');
+    }
   };
 
-  const handleUpdateCompany = (id: string, companyData: Partial<Company>) => {
-    setCompanies((prev) =>
-      prev.map((company) =>
-        company.id === id ? { ...company, ...companyData } : company
-      )
-    );
+  const handleUpdateCompany = async (id: string, companyData: Partial<Company>) => {
+    try {
+      await apiService.updateCompany(id, companyData);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar empresa:', error);
+      alert('Não foi possível atualizar a empresa. Tente novamente.');
+    }
   };
 
-  const handleDeleteCompany = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir esta empresa?")) {
-      setCompanies((prev) => prev.filter((company) => company.id !== id));
-      setUsers((prev) => prev.filter((user) => user.companyId !== id));
+  const handleDeleteCompany = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta empresa?')) {
+      return;
+    }
+
+    try {
+      await apiService.updateCompany(id, { isActive: false });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir empresa:', error);
+      alert('Não foi possível excluir a empresa. Tente novamente.');
     }
   };
 
   // Service management functions
-  const handleAddService = (serviceData: Omit<Service, "id" | "createdAt">) => {
-    const newService: Service = {
-      ...serviceData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    setServices((prev) => [...prev, newService]);
+  const handleAddService = async (serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await apiService.createService({
+        name: serviceData.name,
+        duration: serviceData.duration,
+        description: serviceData.description ?? undefined,
+        price: serviceData.price ?? null,
+      });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao cadastrar serviço:', error);
+      alert('Não foi possível cadastrar o serviço. Tente novamente.');
+    }
   };
 
-  const handleUpdateService = (id: string, serviceData: Partial<Service>) => {
-    setServices((prev) =>
-      prev.map((service) =>
-        service.id === id ? { ...service, ...serviceData } : service
-      )
-    );
+  const handleUpdateService = async (id: string, serviceData: Partial<Service>) => {
+    try {
+      await apiService.updateService(id, serviceData);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar serviço:', error);
+      alert('Não foi possível atualizar o serviço. Tente novamente.');
+    }
   };
 
-  const handleDeleteService = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este serviço?")) {
-      setServices((prev) => prev.filter((service) => service.id !== id));
+  const handleDeleteService = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este serviço?')) {
+      return;
+    }
+
+    try {
+      await apiService.deleteService(id);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir serviço:', error);
+      alert('Não foi possível excluir o serviço. Tente novamente.');
     }
   };
 
   // Admin management functions
-  const handleAddAdmin = (adminData: Omit<User, "id" | "createdAt">) => {
-    const newAdmin: User = {
-      ...adminData,
-      id: Date.now().toString(),
-      role: "admin",
-      createdAt: new Date(),
-    };
-    setUsers((prev) => [...prev, newAdmin]);
+  const handleAddAdmin = async (adminData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }) => {
+    try {
+      await apiService.createUser({
+        name: adminData.name,
+        email: adminData.email,
+        phone: adminData.phone ?? undefined,
+        password: adminData.password,
+        role: 'admin',
+      });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao cadastrar administrador:', error);
+      alert('Não foi possível cadastrar o administrador. Tente novamente.');
+    }
   };
 
-  const handleUpdateAdmin = (id: string, adminData: Partial<User>) => {
-    setUsers((prev) =>
-      prev.map((user) => (user.id === id ? { ...user, ...adminData } : user))
-    );
+  const handleUpdateAdmin = async (id: string, adminData: Partial<User> & { password?: string }) => {
+    try {
+      await apiService.updateUser(id, adminData);
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao atualizar administrador:', error);
+      alert('Não foi possível atualizar o administrador. Tente novamente.');
+    }
   };
 
-  const handleDeleteAdmin = (id: string) => {
-    setUsers((prev) => prev.filter((user) => user.id !== id));
+  const handleDeleteAdmin = async (id: string) => {
+    if (!confirm('Tem certeza que deseja excluir este administrador?')) {
+      return;
+    }
+
+    try {
+      await apiService.updateUser(id, { isActive: false });
+      await loadInitialData();
+    } catch (error) {
+      console.error('Erro ao excluir administrador:', error);
+      alert('Não foi possível excluir o administrador. Tente novamente.');
+    }
   };
 
   const handleUpdateAppointmentStatus = (
@@ -934,8 +1051,19 @@ function App() {
           }`}
         >
           <div className="h-full p-3 sm:p-6">
-            <div className="bg-white rounded-lg shadow-sm h-full">
-              {renderMainContent()}
+            <div className="bg-white rounded-lg shadow-sm h-full relative">
+              {dataError && (
+                <div className="bg-red-50 text-red-700 border border-red-200 px-4 py-3 rounded-lg m-4">
+                  {dataError}
+                </div>
+              )}
+              {isBootstrapping ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 rounded-lg">
+                  <span className="text-gray-600">Sincronizando dados...</span>
+                </div>
+              ) : (
+                renderMainContent()
+              )}
             </div>
           </div>
         </main>
