@@ -4,9 +4,9 @@ import { User as UserType } from '../../types';
 
 interface AdminManagementProps {
   admins: UserType[];
-  onAddAdmin: (admin: Omit<UserType, 'id' | 'createdAt'>) => void;
-  onUpdateAdmin: (id: string, admin: Partial<UserType>) => void;
-  onDeleteAdmin: (id: string) => void;
+  onAddAdmin: (admin: Omit<UserType, 'id' | 'createdAt'>) => void | Promise<void>;
+  onUpdateAdmin: (id: string, admin: Partial<UserType>) => void | Promise<void>;
+  onDeleteAdmin: (id: string) => void | Promise<void>;
   currentUserId: string;
 }
 
