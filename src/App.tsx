@@ -957,6 +957,7 @@ function App() {
             onAddCompany={handleAddCompany}
             onUpdateCompany={handleUpdateCompany}
             onDeleteCompany={handleDeleteCompany}
+            onChangeCompanyPassword={handleChangeCompanyPassword}
           />
         );
 
