@@ -190,120 +190,122 @@ export default function CompanyManagement({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {companies.map((company) => (
-          <div
-            key={company.id}
-            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    {company.name}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {company.employees.length} colaboradores
-                  </p>
-                </div>
-              </div>
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => openPasswordModal(company)}
-                  className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                  title="Alterar Senha"
-                >
-                  <Lock className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedCompany(company);
-                    setIsEmployeeFormOpen(true);
-                  }}
-                  className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                  title="Adicionar Colaborador"
-                >
-                  <UserPlus className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleEdit(company)}
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Editar"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onDeleteCompany(company.id)}
-                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Excluir"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+        {companies.map((company) => {
+          const employeeList = company.employees ?? [];
 
-            <div className="space-y-3">
-              {company.email && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Mail className="w-4 h-4" />
-                  <span>{company.email}</span>
-                </div>
-              )}
-
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Phone className="w-4 h-4" />
-                <span>{company.phone}</span>
-              </div>
-
-              <div className="flex items-start space-x-2 text-sm text-gray-600">
-                <MapPin className="w-4 h-4 mt-0.5" />
-                <span>{company.address}</span>
-              </div>
-
-              <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <Users className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">
-                    Colaboradores:
-                  </span>
-                </div>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {company.employees.map((employee) => (
-                    <div
-                      key={employee.id}
-                      className="flex items-center justify-between bg-gray-50 p-2 rounded"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {employee.name}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {employee.department}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          handleRemoveEmployee(company.id, employee.id)
-                        }
-                        className="text-red-600 hover:text-red-800 text-xs"
-                        title="Remover Colaborador"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                  {company.employees.length === 0 && (
-                    <p className="text-sm text-gray-500 italic">
-                      Nenhum colaborador cadastrado
+          return (
+            <div
+              key={company.id}
+              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">
+                      {company.name}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {employeeList.length} colaboradores
                     </p>
-                  )}
+                  </div>
+                </div>
+                <div className="flex space-x-1">
+                  <button
+                    onClick={() => openPasswordModal(company)}
+                    className="p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                    title="Alterar Senha"
+                  >
+                    <Lock className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedCompany(company);
+                      setIsEmployeeFormOpen(true);
+                    }}
+                    className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                    title="Adicionar Colaborador"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleEdit(company)}
+                    className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteCompany(company.id)}
+                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Excluir"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {company.email && (
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <Mail className="w-4 h-4" />
+                    <span>{company.email}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <Phone className="w-4 h-4" />
+                  <span>{company.phone}</span>
+                </div>
+
+                <div className="flex items-start space-x-2 text-sm text-gray-600">
+                  <MapPin className="w-4 h-4 mt-0.5" />
+                  <span>{company.address}</span>
+                </div>
+
+                <div>
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Users className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Colaboradores:
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {employeeList.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="flex items-center justify-between bg-gray-50 p-2 rounded"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {employee.name}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {employee.department}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveEmployee(company.id, employee.id)}
+                          className="text-red-600 hover:text-red-800 text-xs"
+                          title="Remover Colaborador"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {employeeList.length === 0 && (
+                      <p className="text-sm text-gray-500 italic">
+                        Nenhum colaborador cadastrado
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Company Form Modal */}
