@@ -189,15 +189,20 @@ export default function CompanyManagement({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {companies.map((company) => {
-          const employeeList = company.employees ?? [];
+      {companies.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+          Nenhuma empresa cadastrada até o momento.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {companies.map((company) => {
+            const employeeList = company.employees ?? [];
 
-          return (
-            <div
-              key={company.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
-            >
+            return (
+              <div
+                key={company.id}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+              >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
