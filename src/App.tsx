@@ -1010,6 +1010,7 @@ function App() {
             onAddProvider={handleAddProvider}
             onUpdateProvider={handleUpdateProvider}
             onDeleteProvider={handleDeleteProvider}
+            onChangeProviderPassword={handleChangeProviderPassword}
           />
         );
 
