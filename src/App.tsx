@@ -50,29 +50,36 @@ function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const generateId = React.useCallback(() => (
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : Date.now().toString()
-  ), []);
+  const generateId = React.useCallback(
+    () =>
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Date.now().toString(),
+    []
+  );
 
   const loadInitialData = React.useCallback(
-    async (roleOverride?: User['role']) => {
+    async (roleOverride?: User["role"]) => {
       setIsBootstrapping(true);
       setDataError(null);
       try {
         const effectiveRole = roleOverride ?? currentUser?.role;
 
-        const [companiesRes, providersRes, servicesRes, appointmentsRes, usersRes] =
-          await Promise.all([
-            apiService.getCompanies(),
-            apiService.getProviders(),
-            apiService.getServices(),
-            apiService.getAppointments(),
-            effectiveRole === 'admin'
-              ? apiService.getUsers()
-              : Promise.resolve({ success: true, data: [] }),
-          ]);
+        const [
+          companiesRes,
+          providersRes,
+          servicesRes,
+          appointmentsRes,
+          usersRes,
+        ] = await Promise.all([
+          apiService.getCompanies(),
+          apiService.getProviders(),
+          apiService.getServices(),
+          apiService.getAppointments(),
+          effectiveRole === "admin"
+            ? apiService.getUsers()
+            : Promise.resolve({ success: true, data: [] }),
+        ]);
 
         if (companiesRes.success && companiesRes.data) {
           setCompanies(companiesRes.data);
@@ -98,7 +105,7 @@ function App() {
           setAppointments([]);
         }
 
-        if (effectiveRole === 'admin') {
+        if (effectiveRole === "admin") {
           if (usersRes.success && usersRes.data) {
             setUsers(usersRes.data as User[]);
           } else {
@@ -108,8 +115,8 @@ function App() {
           setUsers([]);
         }
       } catch (error) {
-        console.error('Erro ao carregar dados iniciais:', error);
-        setDataError('Não foi possível carregar os dados do sistema.');
+        console.error("Erro ao carregar dados iniciais:", error);
+        setDataError("Não foi possível carregar os dados do sistema.");
       } finally {
         setIsBootstrapping(false);
       }
@@ -204,8 +211,10 @@ function App() {
   };
 
   // Employee management functions for companies
-  const handleAddEmployee = async (employeeData: Omit<Employee, 'id'>) => {
-    const company = companies.find((item) => item.id === employeeData.companyId);
+  const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
+    const company = companies.find(
+      (item) => item.id === employeeData.companyId
+    );
     if (!company) return;
 
     const newEmployee: Employee = {
@@ -219,8 +228,8 @@ function App() {
       });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao adicionar colaborador:', error);
-      alert('Não foi possível adicionar o colaborador. Tente novamente.');
+      console.error("Erro ao adicionar colaborador:", error);
+      alert("Não foi possível adicionar o colaborador. Tente novamente.");
     }
   };
 
@@ -238,16 +247,18 @@ function App() {
     );
 
     try {
-      await apiService.updateCompany(company.id, { employees: updatedEmployees });
+      await apiService.updateCompany(company.id, {
+        employees: updatedEmployees,
+      });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar colaborador:', error);
-      alert('Não foi possível atualizar o colaborador. Tente novamente.');
+      console.error("Erro ao atualizar colaborador:", error);
+      alert("Não foi possível atualizar o colaborador. Tente novamente.");
     }
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este colaborador?')) {
+    if (!confirm("Tem certeza que deseja excluir este colaborador?")) {
       return;
     }
 
@@ -256,14 +267,18 @@ function App() {
     );
     if (!company) return;
 
-    const updatedEmployees = company.employees.filter((employee) => employee.id !== id);
+    const updatedEmployees = company.employees.filter(
+      (employee) => employee.id !== id
+    );
 
     try {
-      await apiService.updateCompany(company.id, { employees: updatedEmployees });
+      await apiService.updateCompany(company.id, {
+        employees: updatedEmployees,
+      });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir colaborador:', error);
-      alert('Não foi possível excluir o colaborador. Tente novamente.');
+      console.error("Erro ao excluir colaborador:", error);
+      alert("Não foi possível excluir o colaborador. Tente novamente.");
     }
   };
 
@@ -290,22 +305,25 @@ function App() {
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
 
-        if (mappedUser.role === 'company') {
-          setActiveTab('dashboard');
-        } else if (mappedUser.role === 'provider') {
-          setActiveTab('my-schedule');
+        if (mappedUser.role === "company") {
+          setActiveTab("dashboard");
+        } else if (mappedUser.role === "provider") {
+          setActiveTab("my-schedule");
         } else {
-          setActiveTab('calendar');
+          setActiveTab("calendar");
         }
 
         return { success: true as const };
       }
 
-      const message = response.error || 'Falha no login';
+      const message = response.error || "Falha no login";
       return { success: false as const, message };
     } catch (error) {
-      console.error('❌ Erro no login:', error);
-      return { success: false as const, message: 'Erro de conexão com o servidor' };
+      console.error("❌ Erro no login:", error);
+      return {
+        success: false as const,
+        message: "Erro de conexão com o servidor",
+      };
     }
   };
 
@@ -313,7 +331,7 @@ function App() {
     apiService.clearAuthToken();
     setCurrentUser(null);
     setIsAuthenticated(false);
-    setActiveTab('calendar');
+    setActiveTab("calendar");
     setCompanies([]);
     setProviders([]);
     setServices([]);
@@ -370,11 +388,14 @@ function App() {
   };
 
   const handleAppointmentSubmit = async (
-    appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
+    appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
     try {
       if (selectedAppointment) {
-        await apiService.updateAppointment(selectedAppointment.id, appointmentData);
+        await apiService.updateAppointment(
+          selectedAppointment.id,
+          appointmentData
+        );
       } else {
         await apiService.createAppointment({
           companyId: appointmentData.companyId,
@@ -393,8 +414,8 @@ function App() {
 
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao salvar agendamento:', error);
-      alert('Não foi possível salvar o agendamento. Tente novamente.');
+      console.error("Erro ao salvar agendamento:", error);
+      alert("Não foi possível salvar o agendamento. Tente novamente.");
     } finally {
       setSelectedAppointment(null);
       setSelectedDate(null);
@@ -410,8 +431,8 @@ function App() {
       await apiService.updateAppointment(id, appointmentData);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar agendamento:', error);
-      alert('Não foi possível atualizar o agendamento. Tente novamente.');
+      console.error("Erro ao atualizar agendamento:", error);
+      alert("Não foi possível atualizar o agendamento. Tente novamente.");
     }
   };
 
@@ -420,8 +441,8 @@ function App() {
       await apiService.deleteAppointments([id]);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir agendamento:', error);
-      alert('Não foi possível excluir o agendamento. Tente novamente.');
+      console.error("Erro ao excluir agendamento:", error);
+      alert("Não foi possível excluir o agendamento. Tente novamente.");
     }
   };
 
@@ -436,8 +457,8 @@ function App() {
       );
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar agendamentos:', error);
-      alert('Não foi possível atualizar os agendamentos selecionados.');
+      console.error("Erro ao atualizar agendamentos:", error);
+      alert("Não foi possível atualizar os agendamentos selecionados.");
     }
   };
 
@@ -449,8 +470,8 @@ function App() {
       await apiService.deleteAppointments(appointmentIds);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir agendamentos:', error);
-      alert('Não foi possível excluir os agendamentos selecionados.');
+      console.error("Erro ao excluir agendamentos:", error);
+      alert("Não foi possível excluir os agendamentos selecionados.");
     }
   };
 
@@ -461,7 +482,9 @@ function App() {
       await Promise.all(
         slots.map(async (slot: any) => {
           const endTime = calculateEndTime(slot.time, slot.duration);
-          const providerName = providers.find((p) => p.id === slot.providerId)?.name;
+          const providerName = providers.find(
+            (p) => p.id === slot.providerId
+          )?.name;
           const service = services.find((s) => s.id === slot.serviceId);
 
           await apiService.createAppointment({
@@ -474,23 +497,24 @@ function App() {
             startTime: slot.time,
             endTime,
             duration: slot.duration,
-            status: 'scheduled',
-            notes: `Agendamento administrativo - Cadeira ${slot.chair}/${chairs}` +
-              (providerName ? ` - Prestador: ${providerName}` : '') +
-              (service ? ` - Serviço: ${service.name}` : ''),
+            status: "scheduled",
+            notes:
+              `Agendamento administrativo - Cadeira ${slot.chair}/${chairs}` +
+              (providerName ? ` - Prestador: ${providerName}` : "") +
+              (service ? ` - Serviço: ${service.name}` : ""),
           });
         })
       );
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao criar agendamentos:', error);
-      alert('Não foi possível criar os agendamentos. Tente novamente.');
+      console.error("Erro ao criar agendamentos:", error);
+      alert("Não foi possível criar os agendamentos. Tente novamente.");
     }
   };
 
   // 🎯 FUNÇÃO: Handle company booking (update existing appointment em backend)
   const handleCompanyBookAppointment = async (
-    appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
+    appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
     try {
       const existingSlot = appointments.find((apt) => {
@@ -503,7 +527,7 @@ function App() {
           apt.date === appointmentData.date &&
           apt.startTime === appointmentData.startTime &&
           sameService &&
-          (!apt.employeeId || apt.employeeId === '')
+          (!apt.employeeId || apt.employeeId === "")
         );
       });
 
@@ -531,8 +555,8 @@ function App() {
 
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao registrar agendamento da empresa:', error);
-      alert('Não foi possível registrar o agendamento. Tente novamente.');
+      console.error("Erro ao registrar agendamento da empresa:", error);
+      alert("Não foi possível registrar o agendamento. Tente novamente.");
     }
   };
 
@@ -546,26 +570,28 @@ function App() {
       await apiService.updateAppointment(appointmentData.id, {
         employeeId: appointmentData.employeeId ?? null,
         notes: appointmentData.notes,
-        status: 'confirmed',
+        status: "confirmed",
       });
 
       await loadInitialData();
 
       alert(
-        '✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa.'
+        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa."
       );
     } catch (error) {
-      console.error('Erro ao confirmar agendamento público:', error);
-      alert('Não foi possível confirmar o agendamento. Tente novamente.');
+      console.error("Erro ao confirmar agendamento público:", error);
+      alert("Não foi possível confirmar o agendamento. Tente novamente.");
     }
   };
 
   // 🎯 NOVA FUNÇÃO: Handle add employee from public booking
-  const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, 'id'>) => {
-    const company = companies.find((item) => item.id === employeeData.companyId);
+  const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, "id">) => {
+    const company = companies.find(
+      (item) => item.id === employeeData.companyId
+    );
     if (!company) {
-      alert('Empresa não encontrada para associar o colaborador.');
-      return '';
+      alert("Empresa não encontrada para associar o colaborador.");
+      return "";
     }
 
     const newEmployee: Employee = {
@@ -587,8 +613,8 @@ function App() {
       })
       .then(() => loadInitialData(currentUser?.role))
       .catch((error) => {
-        console.error('Erro ao adicionar colaborador público:', error);
-        alert('Não foi possível adicionar o colaborador. Tente novamente.');
+        console.error("Erro ao adicionar colaborador público:", error);
+        alert("Não foi possível adicionar o colaborador. Tente novamente.");
         loadInitialData(currentUser?.role);
       });
 
@@ -614,7 +640,7 @@ function App() {
   }
 
   // Provider management functions
-  const handleAddProvider = async (providerData: Omit<Provider, 'id'>) => {
+  const handleAddProvider = async (providerData: Omit<Provider, "id">) => {
     try {
       await apiService.createProvider({
         name: providerData.name,
@@ -627,8 +653,8 @@ function App() {
       });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao cadastrar prestador:', error);
-      alert('Não foi possível cadastrar o prestador. Tente novamente.');
+      console.error("Erro ao cadastrar prestador:", error);
+      alert("Não foi possível cadastrar o prestador. Tente novamente.");
     }
   };
 
@@ -640,13 +666,13 @@ function App() {
       await apiService.updateProvider(id, providerData);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar prestador:', error);
-      alert('Não foi possível atualizar o prestador. Tente novamente.');
+      console.error("Erro ao atualizar prestador:", error);
+      alert("Não foi possível atualizar o prestador. Tente novamente.");
     }
   };
 
   const handleDeleteProvider = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este prestador?')) {
+    if (!confirm("Tem certeza que deseja excluir este prestador?")) {
       return;
     }
 
@@ -654,14 +680,14 @@ function App() {
       await apiService.updateProvider(id, { isActive: false });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir prestador:', error);
-      alert('Não foi possível excluir o prestador. Tente novamente.');
+      console.error("Erro ao excluir prestador:", error);
+      alert("Não foi possível excluir o prestador. Tente novamente.");
     }
   };
 
   // Company management functions
   const handleAddCompany = async (
-    companyData: Omit<Company, 'id'>,
+    companyData: Omit<Company, "id">,
     options?: { password?: string }
   ) => {
     try {
@@ -679,7 +705,7 @@ function App() {
       });
 
       if (!createResponse.success || !createResponse.data) {
-        throw new Error(createResponse.error || 'Erro ao salvar empresa');
+        throw new Error(createResponse.error || "Erro ao salvar empresa");
       }
 
       const createdCompany = createResponse.data;
@@ -690,30 +716,33 @@ function App() {
           email: companyData.email,
           phone: companyData.phone ?? undefined,
           password: options.password,
-          role: 'company',
+          role: "company",
           companyId: createdCompany.id,
         });
       }
 
       await loadInitialData(currentUser?.role);
     } catch (error) {
-      console.error('Erro ao cadastrar empresa:', error);
-      alert('Não foi possível cadastrar a empresa. Tente novamente.');
+      console.error("Erro ao cadastrar empresa:", error);
+      alert("Não foi possível cadastrar a empresa. Tente novamente.");
     }
   };
 
-  const handleUpdateCompany = async (id: string, companyData: Partial<Company>) => {
+  const handleUpdateCompany = async (
+    id: string,
+    companyData: Partial<Company>
+  ) => {
     try {
       await apiService.updateCompany(id, companyData);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar empresa:', error);
-      alert('Não foi possível atualizar a empresa. Tente novamente.');
+      console.error("Erro ao atualizar empresa:", error);
+      alert("Não foi possível atualizar a empresa. Tente novamente.");
     }
   };
 
   const handleDeleteCompany = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta empresa?')) {
+    if (!confirm("Tem certeza que deseja excluir esta empresa?")) {
       return;
     }
 
@@ -721,13 +750,37 @@ function App() {
       await apiService.updateCompany(id, { isActive: false });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir empresa:', error);
-      alert('Não foi possível excluir a empresa. Tente novamente.');
+      console.error("Erro ao excluir empresa:", error);
+      alert("Não foi possível excluir a empresa. Tente novamente.");
+    }
+  };
+  // Alterar senha da empresa
+  const handleChangeCompanyPassword = async (
+    companyId: string,
+    password: string
+  ) => {
+    try {
+      // Atualiza a empresa com a nova senha no backend
+      const response = await apiService.updateCompany(companyId, { password });
+
+      if (response.success) {
+        alert("Senha alterada com sucesso!");
+        await loadInitialData(currentUser?.role);
+      } else {
+        alert(
+          "Erro ao alterar senha: " + (response.error || "Tente novamente.")
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao alterar senha da empresa:", error);
+      alert("Não foi possível alterar a senha. Tente novamente.");
     }
   };
 
   // Service management functions
-  const handleAddService = async (serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleAddService = async (
+    serviceData: Omit<Service, "id" | "createdAt" | "updatedAt">
+  ) => {
     try {
       await apiService.createService({
         name: serviceData.name,
@@ -737,23 +790,26 @@ function App() {
       });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao cadastrar serviço:', error);
-      alert('Não foi possível cadastrar o serviço. Tente novamente.');
+      console.error("Erro ao cadastrar serviço:", error);
+      alert("Não foi possível cadastrar o serviço. Tente novamente.");
     }
   };
 
-  const handleUpdateService = async (id: string, serviceData: Partial<Service>) => {
+  const handleUpdateService = async (
+    id: string,
+    serviceData: Partial<Service>
+  ) => {
     try {
       await apiService.updateService(id, serviceData);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar serviço:', error);
-      alert('Não foi possível atualizar o serviço. Tente novamente.');
+      console.error("Erro ao atualizar serviço:", error);
+      alert("Não foi possível atualizar o serviço. Tente novamente.");
     }
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este serviço?')) {
+    if (!confirm("Tem certeza que deseja excluir este serviço?")) {
       return;
     }
 
@@ -761,40 +817,47 @@ function App() {
       await apiService.deleteService(id);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir serviço:', error);
-      alert('Não foi possível excluir o serviço. Tente novamente.');
+      console.error("Erro ao excluir serviço:", error);
+      alert("Não foi possível excluir o serviço. Tente novamente.");
     }
   };
 
   // Admin management functions
-  const handleAddAdmin = async (adminData: Omit<User, 'id' | 'createdAt' | 'updatedAt'> & { password?: string }) => {
+  const handleAddAdmin = async (
+    adminData: Omit<User, "id" | "createdAt" | "updatedAt"> & {
+      password?: string;
+    }
+  ) => {
     try {
       await apiService.createUser({
         name: adminData.name,
         email: adminData.email,
         phone: adminData.phone ?? undefined,
         password: adminData.password,
-        role: 'admin',
+        role: "admin",
       });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao cadastrar administrador:', error);
-      alert('Não foi possível cadastrar o administrador. Tente novamente.');
+      console.error("Erro ao cadastrar administrador:", error);
+      alert("Não foi possível cadastrar o administrador. Tente novamente.");
     }
   };
 
-  const handleUpdateAdmin = async (id: string, adminData: Partial<User> & { password?: string }) => {
+  const handleUpdateAdmin = async (
+    id: string,
+    adminData: Partial<User> & { password?: string }
+  ) => {
     try {
       await apiService.updateUser(id, adminData);
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao atualizar administrador:', error);
-      alert('Não foi possível atualizar o administrador. Tente novamente.');
+      console.error("Erro ao atualizar administrador:", error);
+      alert("Não foi possível atualizar o administrador. Tente novamente.");
     }
   };
 
   const handleDeleteAdmin = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este administrador?')) {
+    if (!confirm("Tem certeza que deseja excluir este administrador?")) {
       return;
     }
 
@@ -802,8 +865,8 @@ function App() {
       await apiService.updateUser(id, { isActive: false });
       await loadInitialData();
     } catch (error) {
-      console.error('Erro ao excluir administrador:', error);
-      alert('Não foi possível excluir o administrador. Tente novamente.');
+      console.error("Erro ao excluir administrador:", error);
+      alert("Não foi possível excluir o administrador. Tente novamente.");
     }
   };
 
