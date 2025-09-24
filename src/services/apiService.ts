@@ -7,7 +7,7 @@ import {
   ProviderWorkingHours,
   Service,
   User,
-} from '../types';
+} from "../types";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -23,20 +23,20 @@ class ApiService {
   constructor() {
     const envBaseUrl =
       import.meta.env.VITE_API_BASE_URL ??
-      'https://qualycorpore.chztech.com.br/api';
+      "https://qualycorpore.chztech.com.br/api";
     this.baseUrl = envBaseUrl;
 
-    this.token = localStorage.getItem('authToken');
+    this.token = localStorage.getItem("authToken");
   }
 
   setAuthToken(token: string) {
     this.token = token;
-    localStorage.setItem('authToken', token);
+    localStorage.setItem("authToken", token);
   }
 
   clearAuthToken() {
     this.token = null;
-    localStorage.removeItem('authToken');
+    localStorage.removeItem("authToken");
   }
 
   private async request<T>(
@@ -47,21 +47,21 @@ class ApiService {
       const url = `${this.baseUrl}${endpoint}`;
 
       const headers: HeadersInit = {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       };
 
       const fetchOptions: RequestInit = {
         ...options,
         headers,
-        credentials: 'include',
+        credentials: "include",
       };
 
       if (fetchOptions.body instanceof FormData) {
-        delete (fetchOptions.headers as Record<string, string>)['Content-Type'];
+        delete (fetchOptions.headers as Record<string, string>)["Content-Type"];
       } else if (
         fetchOptions.body &&
-        typeof fetchOptions.body !== 'string' &&
+        typeof fetchOptions.body !== "string" &&
         !(fetchOptions.body instanceof ArrayBuffer)
       ) {
         fetchOptions.body = JSON.stringify(fetchOptions.body);
@@ -91,10 +91,10 @@ class ApiService {
         message: data.message,
       };
     } catch (error) {
-      console.error('API Request Error:', error);
+      console.error("API Request Error:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Erro de conex�o',
+        error: error instanceof Error ? error.message : "Erro de conex�o",
       };
     }
   }
@@ -102,8 +102,8 @@ class ApiService {
   private mapEmployee(record: any): Employee {
     return {
       id: record.id,
-      companyId: record.companyId ?? record.company_id ?? '',
-      name: record.name ?? '',
+      companyId: record.companyId ?? record.company_id ?? "",
+      name: record.name ?? "",
       phone: record.phone ?? null,
       department: record.department ?? null,
       createdAt: record.createdAt ?? record.created_at,
@@ -114,7 +114,7 @@ class ApiService {
   private mapCompany(record: any): Company {
     return {
       id: record.id,
-      name: record.name ?? '',
+      name: record.name ?? "",
       address: record.address ?? null,
       phone: record.phone ?? null,
       email: record.email ?? null,
@@ -130,10 +130,10 @@ class ApiService {
 
   private parseJson<T>(value: unknown, fallback: T): T {
     if (value === null || value === undefined) return fallback;
-    if (Array.isArray(value) || typeof value === 'object') {
+    if (Array.isArray(value) || typeof value === "object") {
       return value as T;
     }
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       try {
         const parsed = JSON.parse(value);
         return parsed ?? fallback;
@@ -155,8 +155,8 @@ class ApiService {
     return {
       id: record.id,
       userId: record.userId ?? record.user_id ?? null,
-      name: record.name ?? '',
-      email: record.email ?? '',
+      name: record.name ?? "",
+      email: record.email ?? "",
       phone: record.phone ?? null,
       specialties,
       workingHours,
@@ -170,7 +170,7 @@ class ApiService {
   private mapService(record: any): Service {
     return {
       id: record.id,
-      name: record.name ?? '',
+      name: record.name ?? "",
       duration: Number(record.duration ?? 0),
       description: record.description ?? null,
       price:
@@ -186,11 +186,11 @@ class ApiService {
   private mapAppointment(record: any): Appointment {
     return {
       id: record.id,
-      date: record.date ?? '',
-      startTime: record.startTime ?? record.start_time ?? '',
-      endTime: record.endTime ?? record.end_time ?? '',
+      date: record.date ?? "",
+      startTime: record.startTime ?? record.start_time ?? "",
+      endTime: record.endTime ?? record.end_time ?? "",
       duration: Number(record.duration ?? 0),
-      status: (record.status ?? 'scheduled') as Appointment['status'],
+      status: (record.status ?? "scheduled") as Appointment["status"],
       companyId: record.companyId ?? record.company_id ?? null,
       providerId: record.providerId ?? record.provider_id ?? null,
       clientId: record.clientId ?? record.client_id ?? null,
@@ -209,10 +209,10 @@ class ApiService {
   private mapUser(record: any): User {
     return {
       id: record.id,
-      name: record.name ?? '',
-      email: record.email ?? '',
+      name: record.name ?? "",
+      email: record.email ?? "",
       phone: record.phone ?? null,
-      role: record.role ?? 'client',
+      role: record.role ?? "client",
       companyId: record.companyId ?? record.company_id ?? null,
       isActive: record.isActive ?? record.is_active ?? true,
       createdAt: record.createdAt ?? record.created_at,
@@ -222,29 +222,23 @@ class ApiService {
 
   // Auth -------------------------------------------------
   async login(email: string, password: string) {
-    return this.request<{ user: any; token: string }>(
-      '/auth/login.php',
-      {
-        method: 'POST',
-        body: { email, password },
-      }
-    );
+    return this.request<{ user: any; token: string }>("/auth/login.php", {
+      method: "POST",
+      body: { email, password },
+    });
   }
 
   async verify() {
-    return this.request<{ user: any }>('/auth/verify.php', {
-      method: 'GET',
+    return this.request<{ user: any }>("/auth/verify.php", {
+      method: "GET",
     });
   }
 
   // Companies -------------------------------------------
   async getCompanies() {
-    const response = await this.request<any[]>(
-      '/companies/index.php',
-      {
-        method: 'GET',
-      }
-    );
+    const response = await this.request<any[]>("/companies/index.php", {
+      method: "GET",
+    });
 
     if (response.success && Array.isArray(response.data)) {
       return {
@@ -262,10 +256,10 @@ class ApiService {
     phone?: string;
     email?: string;
     notes?: string;
-    employees?: Array<Pick<Employee, 'name' | 'phone' | 'department'>>;
+    employees?: Array<Pick<Employee, "name" | "phone" | "department">>;
   }) {
-    const response = await this.request<any>('/companies/create.php', {
-      method: 'POST',
+    const response = await this.request<any>("/companies/create.php", {
+      method: "POST",
       body: {
         name: payload.name,
         address: payload.address,
@@ -291,8 +285,8 @@ class ApiService {
   }
 
   async updateCompany(id: string, payload: Partial<Company>) {
-    const response = await this.request<any>('/companies/update.php', {
-      method: 'POST',
+    const response = await this.request<any>("/companies/update.php", {
+      method: "POST",
       body: {
         id,
         name: payload.name,
@@ -314,12 +308,9 @@ class ApiService {
 
   // Providers -------------------------------------------
   async getProviders() {
-    const response = await this.request<any[]>(
-      '/providers/index.php',
-      {
-        method: 'GET',
-      }
-    );
+    const response = await this.request<any[]>("/providers/index.php", {
+      method: "GET",
+    });
 
     if (response.success && Array.isArray(response.data)) {
       return {
@@ -330,7 +321,13 @@ class ApiService {
 
     return response as ApiResponse<Provider[]>;
   }
-
+  // 🔑 Alterar senha da empresa
+  async changeCompanyPassword(companyId: string, password: string) {
+    return this.request<{ message: string }>("/companies/password.php", {
+      method: "PUT",
+      body: { companyId, password },
+    });
+  }
   async createProvider(payload: {
     name: string;
     email: string;
@@ -341,8 +338,8 @@ class ApiService {
     createUser?: boolean;
     userId?: string;
   }) {
-    const response = await this.request<any>('/providers/create.php', {
-      method: 'POST',
+    const response = await this.request<any>("/providers/create.php", {
+      method: "POST",
       body: {
         name: payload.name,
         email: payload.email,
@@ -366,8 +363,8 @@ class ApiService {
   }
 
   async updateProvider(id: string, payload: Partial<Provider>) {
-    const response = await this.request<any>('/providers/update.php', {
-      method: 'POST',
+    const response = await this.request<any>("/providers/update.php", {
+      method: "POST",
       body: {
         id,
         name: payload.name,
@@ -385,8 +382,8 @@ class ApiService {
 
   // Services -------------------------------------------
   async getServices() {
-    const response = await this.request<any[]>('/services/index.php', {
-      method: 'GET',
+    const response = await this.request<any[]>("/services/index.php", {
+      method: "GET",
     });
 
     if (response.success && Array.isArray(response.data)) {
@@ -405,8 +402,8 @@ class ApiService {
     description?: string;
     price?: number | null;
   }) {
-    const response = await this.request<any>('/services/index.php', {
-      method: 'POST',
+    const response = await this.request<any>("/services/index.php", {
+      method: "POST",
       body: payload,
     });
 
@@ -421,8 +418,8 @@ class ApiService {
   }
 
   async updateService(id: string, payload: Partial<Service>) {
-    const response = await this.request<any>('/services/index.php', {
-      method: 'PUT',
+    const response = await this.request<any>("/services/index.php", {
+      method: "PUT",
       body: {
         id,
         ...payload,
@@ -434,17 +431,19 @@ class ApiService {
 
   async deleteService(id: string) {
     return this.request<{ id: string }>(`/services/index.php?id=${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   // Appointments ---------------------------------------
   async getAppointments(params?: Record<string, string>) {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
+    const queryString = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : "";
     const response = await this.request<any[]>(
       `/appointments/index.php${queryString}`,
       {
-        method: 'GET',
+        method: "GET",
       }
     );
 
@@ -463,7 +462,7 @@ class ApiService {
     startTime: string;
     endTime?: string;
     duration: number;
-    status?: Appointment['status'];
+    status?: Appointment["status"];
     companyId?: string | null;
     providerId?: string | null;
     clientId?: string | null;
@@ -471,8 +470,8 @@ class ApiService {
     serviceId?: string | null;
     notes?: string | null;
   }) {
-    const response = await this.request<any>('/appointments/index.php', {
-      method: 'POST',
+    const response = await this.request<any>("/appointments/index.php", {
+      method: "POST",
       body: payload,
     });
 
@@ -487,8 +486,8 @@ class ApiService {
   }
 
   async updateAppointment(id: string, payload: Partial<Appointment>) {
-    return this.request<{ id: string }>('/appointments/update.php', {
-      method: 'POST',
+    return this.request<{ id: string }>("/appointments/update.php", {
+      method: "POST",
       body: {
         id,
         ...payload,
@@ -497,21 +496,18 @@ class ApiService {
   }
 
   async deleteAppointments(ids: string[]) {
-    return this.request<{ ids: string[] }>('/appointments/delete.php', {
-      method: 'POST',
+    return this.request<{ ids: string[] }>("/appointments/delete.php", {
+      method: "POST",
       body: { ids },
     });
   }
 
   // Users ----------------------------------------------
   async getUsers(role?: string) {
-    const query = role ? `?role=${encodeURIComponent(role)}` : '';
-    const response = await this.request<any[]>(
-      `/users/index.php${query}`,
-      {
-        method: 'GET',
-      }
-    );
+    const query = role ? `?role=${encodeURIComponent(role)}` : "";
+    const response = await this.request<any[]>(`/users/index.php${query}`, {
+      method: "GET",
+    });
 
     if (response.success && Array.isArray(response.data)) {
       return {
@@ -527,12 +523,12 @@ class ApiService {
     name: string;
     email: string;
     password?: string;
-    role: User['role'];
+    role: User["role"];
     phone?: string;
     companyId?: string;
   }) {
-    const response = await this.request<any>('/users/create.php', {
-      method: 'POST',
+    const response = await this.request<any>("/users/create.php", {
+      method: "POST",
       body: {
         name: payload.name,
         email: payload.email,
@@ -554,8 +550,8 @@ class ApiService {
   }
 
   async updateUser(id: string, payload: Partial<User> & { password?: string }) {
-    return this.request<{ id: string }>('/users/update.php', {
-      method: 'POST',
+    return this.request<{ id: string }>("/users/update.php", {
+      method: "POST",
       body: {
         id,
         ...payload,
