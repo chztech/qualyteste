@@ -4,9 +4,10 @@ import { Provider } from '../../types';
 
 interface ProviderManagementProps {
   providers: Provider[];
-  onAddProvider: (provider: Omit<Provider, 'id'>) => void | Promise<void>;
+  onAddProvider: (provider: Omit<Provider, 'id'>, options?: { password?: string }) => void | Promise<void>;
   onUpdateProvider: (id: string, provider: Partial<Provider>) => void | Promise<void>;
   onDeleteProvider: (id: string) => void | Promise<void>;
+  onChangeProviderPassword: (providerId: string, password: string) => void | Promise<void>;
 }
 
 export default function ProviderManagement({
@@ -72,18 +73,23 @@ export default function ProviderManagement({
     resetForm();
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!selectedProviderForPassword || !newPassword) {
       alert('Por favor, digite uma nova senha.');
       return;
     }
 
-    // Simular alteração de senha
-    alert(`Senha alterada com sucesso para ${selectedProviderForPassword.name}!\n\nNova senha: ${newPassword}\n\nAnote esta senha para fornecer ao prestador.`);
-    
-    setIsPasswordModalOpen(false);
-    setSelectedProviderForPassword(null);
-    setNewPassword('');
+    try {
+      await onChangeProviderPassword(selectedProviderForPassword.id, newPassword);
+      alert(`Senha alterada com sucesso para ${selectedProviderForPassword.name}!`);
+    } catch (error) {
+      console.error('Erro ao alterar senha do prestador:', error);
+      alert('Não foi possível alterar a senha. Tente novamente.');
+    } finally {
+      setIsPasswordModalOpen(false);
+      setSelectedProviderForPassword(null);
+      setNewPassword('');
+    }
   };
 
   const openPasswordModal = (provider: Provider) => {
