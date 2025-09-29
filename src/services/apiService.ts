@@ -580,7 +580,7 @@ class ApiService {
 
 export const apiService = new ApiService();
 export default apiService;
-=======
+
 // src/services/apiService.ts
 import {
   Appointment,
