@@ -29,7 +29,6 @@ function joinUrl(base: string, endpoint: string): string {
 
 function parseJsonSafe(text: string, status: number): { ok: boolean; data?: any; errorText?: string } {
   if (!text || text.trim().length === 0) {
-    // corpo vazio (ex.: erro de backend/OPTIONS/etc.)
     return { ok: false, errorText: `Resposta vazia (HTTP ${status})` };
   }
   try {
@@ -76,20 +75,17 @@ class ApiService {
     const fetchOptions: RequestInit = {
       ...options,
       headers,
-      credentials: "include", // mantém cookies/sessão caso use
+      credentials: "include",
       mode: "cors",
     };
 
-    // Se body for objeto, transforma em JSON string
     if (fetchOptions.body && typeof fetchOptions.body !== "string" && !(fetchOptions.body instanceof FormData)) {
       fetchOptions.body = JSON.stringify(fetchOptions.body);
     }
-    // Se for FormData, deixa o browser setar o Content-Type
     if (fetchOptions.body instanceof FormData) {
       delete (fetchOptions.headers as Record<string, string>)["Content-Type"];
     }
 
-    // Token Bearer
     if (this.token) {
       fetchOptions.headers = {
         ...fetchOptions.headers,
@@ -103,7 +99,6 @@ class ApiService {
 
       const tryParse = parseJsonSafe(text, res.status);
       if (!tryParse.ok) {
-        // resposta não-JSON ou vazia
         return {
           success: false,
           error: `Resposta não-JSON (${res.status})`,
@@ -113,7 +108,6 @@ class ApiService {
 
       const data = tryParse.data;
 
-      // Convencionalmente suas APIs retornam { success, data, message, error }
       if (!res.ok || data?.success === false) {
         return {
           success: false,
@@ -122,7 +116,6 @@ class ApiService {
         };
       }
 
-      // Normaliza para ApiResponse<T>
       return {
         success: true,
         data: (data?.data as T) ?? (data as T) ?? undefined,
@@ -147,7 +140,9 @@ class ApiService {
       companyId: record.companyId ?? record.company_id ?? null,
       createdAt: record.createdAt ?? record.created_at,
       updatedAt: record.updatedAt ?? record.updated_at,
-    };
+      // se o backend enviar is_active como 0/1
+      isActive: (record.isActive ?? record.is_active ?? 1) ? true : false,
+    } as User;
   }
 
   private mapEmployee(record: any): Employee {
@@ -188,7 +183,7 @@ class ApiService {
       specialties: record.specialties ?? [],
       workingHours: record.workingHours ?? record.working_hours ?? null,
       breaks: record.breaks ?? [],
-      isActive: record.isActive ?? record.is_active ?? true,
+      isActive: (record.isActive ?? record.is_active ?? 1) ? true : false,
       createdAt: record.createdAt ?? record.created_at,
       updatedAt: record.updatedAt ?? record.updated_at,
     };
@@ -204,7 +199,7 @@ class ApiService {
         record.price !== undefined && record.price !== null
           ? Number(record.price)
           : null,
-      isActive: record.isActive ?? record.is_active ?? true,
+      isActive: (record.isActive ?? record.is_active ?? 1) ? true : false,
       createdAt: record.createdAt ?? record.created_at,
       updatedAt: record.updatedAt ?? record.updated_at,
     };
@@ -235,8 +230,8 @@ class ApiService {
       method: "POST",
       body: { email, password },
     });
-    if (response.success && response.data?.token) {
-      this.setAuthToken(response.data.token);
+    if (response.success && (response.data as any)?.token) {
+      this.setAuthToken((response.data as any).token);
     }
     return response;
   }
@@ -254,6 +249,22 @@ class ApiService {
 
   logout() {
     this.clearAuthToken();
+  }
+
+  // ---- Users --------------------------------------------------------------
+  async getUsers(params?: { role?: string; companyId?: string; isActive?: boolean }) {
+    const qs = new URLSearchParams();
+    if (params?.role) qs.set("role", params.role);
+    if (params?.companyId) qs.set("companyId", params.companyId);
+    if (typeof params?.isActive === "boolean") qs.set("isActive", params.isActive ? "1" : "0");
+
+    const res = await this.request<any[]>(`/users/index.php${qs.toString() ? `?${qs.toString()}` : ""}`, {
+      method: "GET",
+    });
+
+    if (!res.success) return res as ApiResponse<User[]>;
+    const rows = Array.isArray(res.data) ? res.data : [];
+    return { success: true, data: rows.map((r) => this.mapUser(r)) } as ApiResponse<User[]>;
   }
 
   // ---- Companies ----------------------------------------------------------
@@ -312,6 +323,7 @@ class ApiService {
     breaks?: ProviderBreak[];
     createUser?: boolean;
     userId?: string;
+    companyId?: string | null;
   }) {
     return this.request<{ id: string }>("/providers/create.php", {
       method: "POST",
