@@ -1,0 +1,40 @@
+name: Deploy Node.js API (dist only) to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout código
+        uses: actions/checkout@v3
+
+      - name: 🧰 Instalar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: 📥 Instalar dependências
+        run: npm install
+
+      - name: 🛠️ Compilar TypeScript
+        run: npm run build
+
+      - name: 🗃️ Copiar arquivos necessários para pasta de deploy
+        run: |
+          mkdir publish
+          cp -r dist publish/
+          cp package.json publish/
+          cp package-lock.json publish/ || true
+
+      - name: 🚀 Deploy no Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: QualyCopore
+          slot-name: production
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          package: publish

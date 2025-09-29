@@ -1,0 +1,38 @@
+RewriteEngine On
+
+# Permite chamar /auth/login sem o .php
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]
+
+# Se não for arquivo ou diretório, manda para index.php (rota padrão tipo API REST)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Bloquear acesso direto à pasta config
+RewriteRule ^config/ - [F,L]
+
+# Headers de segurança
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "DENY"
+Header always set X-XSS-Protection "1; mode=block"
+
+# Configuração de CORS
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "https://corpore.netlify.app"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Allow-Credentials "true"
+</IfModule>
+
+# OPTIONS (preflight) deve responder 200 sem redirecionar
+<IfModule mod_rewrite.c>
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ - [R=200,L]
+</IfModule>
+
+# Evitar cache
+<IfModule mod_expires.c>
+    ExpiresActive Off
+</IfModule>

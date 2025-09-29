@@ -12,5 +12,13 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-  </body>
+  
+  <!-- Banner LGPD -->
+  <div id="lgpd-banner" style="position:fixed;bottom:0;left:0;width:100%;background:#222;color:#fff;padding:15px;text-align:center;z-index:9999;font-size:14px;">
+    Este site coleta e trata dados pessoais conforme a
+    <a href="/politica-privacidade.html" style="color:#4CAF50;">LGPD</a>.
+    Ao continuar navegando, você concorda com nossa política.
+    <button onclick="document.getElementById('lgpd-banner').style.display='none'" style="margin-left:15px;padding:5px 10px;background:#4CAF50;color:white;border:none;border-radius:5px;">Aceitar</button>
+  </div>
+</body>
 </html>

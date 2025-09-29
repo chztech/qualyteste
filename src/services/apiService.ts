@@ -396,6 +396,16 @@ class ApiService {
     return response as ApiResponse<Service[]>;
   }
 
+  async updateProviderPassword(providerId: string, password: string) {
+    return this.request<{ success: boolean; message?: string }>(
+      '/providers/password.php',
+      {
+        method: 'PUT',
+        body: { providerId, password },
+      }
+    );
+  }
+
   async createService(payload: {
     name: string;
     duration: number;

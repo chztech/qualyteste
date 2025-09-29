@@ -273,3 +273,4 @@ if (configErrors.length > 0) {
 }
 
 export default config;
+// Use VITE_API_BASE_URL no .env para configurar a URL do backend

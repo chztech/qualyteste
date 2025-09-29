@@ -14,7 +14,7 @@ interface BackendIntegrationConfig {
 export function useBackendIntegration<T>(
   key: string,
   initialData: T[],
-  config: BackendIntegrationConfig = { useLocalStorage: false }
+  config: BackendIntegrationConfig = { useLocalStorage: true }
 ) {
   const [localData, setLocalData] = useLocalStorage(key, initialData);
   const [apiData, setApiData] = useState<T[]>([]);

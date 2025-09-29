@@ -1,10 +1,17 @@
 <?php
 class Database {
     private $host = "localhost";
-    private $db_name = "cpanel_user_qualycorpore"; // Substitua pelo nome real do seu banco
-    private $username = "cpanel_user_qualycorpore_user"; // Substitua pelo usuário real
-    private $password = "sua_senha_forte"; // Substitua pela senha real
+    private $db_name; // Substitua pelo nome real do seu banco
+    private $username; // Substitua pelo usuário real
+    private $password; // Substitua pela senha real
     public $conn;
+
+    public function __construct() {
+        $this->db_name = getenv('DB_NAME') ?: 'chztec51_qualycorpore';
+        $this->username = getenv('DB_USER') ?: 'root';
+        $this->password = getenv('DB_PASS') ?: '';
+    }
+
 
     public function getConnection() {
         $this->conn = null;
