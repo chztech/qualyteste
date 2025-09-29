@@ -380,14 +380,6 @@ class ApiService {
     return response as ApiResponse<{ id: string }>;
   }
 
-  
-  async changeProviderPassword(payload: { providerId?: string; userId?: string; password: string }) {
-    return this.request<{ message: string }>("/providers/password.php", {
-      method: "PUT",
-      body: payload,
-    });
-  }
-
   // Services -------------------------------------------
   async getServices() {
     const response = await this.request<any[]>("/services/index.php", {
