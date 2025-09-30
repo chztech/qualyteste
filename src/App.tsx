@@ -755,21 +755,15 @@ function App() {
     }
   };
   // Alterar senha da empresa
-const handleChangeCompanyPassword = async (
-  companyId: string,
-  password: string
-) => {
-  try {
-    const res = await apiService.changeCompanyPassword(companyId, password); // ✅ usa o endpoint correto
-    if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
-    alert("Senha alterada com sucesso!");
-    await loadInitialData(currentUser?.role);
-  } catch (error) {
-    console.error("Erro ao alterar senha da empresa:", error);
-    alert("Não foi possível alterar a senha. Tente novamente.");
-  }
-};
-
+  const handleChangeCompanyPassword = async (
+    companyId: string,
+    password: string
+  ) => {
+    try {
+      const res = await apiService.changeCompanyPassword(companyId, password); // ✅ usa o endpoint correto
+      if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
+      alert("Senha alterada com sucesso!");
+      await loadInitialData(currentUser?.role);
     } catch (error) {
       console.error("Erro ao alterar senha da empresa:", error);
       alert("Não foi possível alterar a senha. Tente novamente.");
