@@ -684,6 +684,26 @@ function App() {
       alert("Não foi possível excluir o prestador. Tente novamente.");
     }
   };
+  // 🔑 Trocar senha do prestador (chama a API)
+  const handleChangeProviderPassword = async (
+    providerId: string,
+    password: string
+  ) => {
+    try {
+      const res = await apiService.changeProviderPassword({
+        providerId,
+        password,
+      });
+      if (!res.success)
+        throw new Error(res.error || "Falha ao atualizar senha");
+      alert("Senha do prestador atualizada com sucesso.");
+      // opcional: recarregar a lista
+      // await loadInitialData(currentUser?.role);
+    } catch (error) {
+      console.error("Erro ao atualizar senha do prestador:", error);
+      alert("Não foi possível atualizar a senha. Tente novamente.");
+    }
+  };
 
   // Company management functions
   const handleAddCompany = async (
