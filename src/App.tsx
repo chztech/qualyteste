@@ -684,26 +684,6 @@ function App() {
       alert("Não foi possível excluir o prestador. Tente novamente.");
     }
   };
-  // 🔑 Trocar senha do prestador (chama a API)
-  const handleChangeProviderPassword = async (
-    providerId: string,
-    password: string
-  ) => {
-    try {
-      const res = await apiService.changeProviderPassword({
-        providerId,
-        password,
-      });
-      if (!res.success)
-        throw new Error(res.error || "Falha ao atualizar senha");
-      alert("Senha do prestador atualizada com sucesso.");
-      // opcional: recarregar a lista
-      // await loadInitialData(currentUser?.role);
-    } catch (error) {
-      console.error("Erro ao atualizar senha do prestador:", error);
-      alert("Não foi possível atualizar a senha. Tente novamente.");
-    }
-  };
 
   // Company management functions
   const handleAddCompany = async (
@@ -775,22 +755,21 @@ function App() {
     }
   };
   // Alterar senha da empresa
-  const handleChangeCompanyPassword = async (
-    companyId: string,
-    password: string
-  ) => {
-    try {
-      // Atualiza a empresa com a nova senha no backend
-      const response = await apiService.updateCompany(companyId, { password });
+const handleChangeCompanyPassword = async (
+  companyId: string,
+  password: string
+) => {
+  try {
+    const res = await apiService.changeCompanyPassword(companyId, password); // ✅ usa o endpoint correto
+    if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
+    alert("Senha alterada com sucesso!");
+    await loadInitialData(currentUser?.role);
+  } catch (error) {
+    console.error("Erro ao alterar senha da empresa:", error);
+    alert("Não foi possível alterar a senha. Tente novamente.");
+  }
+};
 
-      if (response.success) {
-        alert("Senha alterada com sucesso!");
-        await loadInitialData(currentUser?.role);
-      } else {
-        alert(
-          "Erro ao alterar senha: " + (response.error || "Tente novamente.")
-        );
-      }
     } catch (error) {
       console.error("Erro ao alterar senha da empresa:", error);
       alert("Não foi possível alterar a senha. Tente novamente.");
