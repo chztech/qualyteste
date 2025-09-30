@@ -28,7 +28,7 @@ import {
   Employee,
   Service,
 } from "./types";
-import { Building2, Calendar as CalendarIcon } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 function App() {
   // Authentication state
@@ -81,36 +81,25 @@ function App() {
             : Promise.resolve({ success: true, data: [] }),
         ]);
 
-        if (companiesRes.success && companiesRes.data) {
-          setCompanies(companiesRes.data);
-        } else {
-          setCompanies([]);
-        }
-
-        if (providersRes.success && providersRes.data) {
-          setProviders(providersRes.data);
-        } else {
-          setProviders([]);
-        }
-
-        if (servicesRes.success && servicesRes.data) {
-          setServices(servicesRes.data);
-        } else {
-          setServices([]);
-        }
-
-        if (appointmentsRes.success && appointmentsRes.data) {
-          setAppointments(appointmentsRes.data);
-        } else {
-          setAppointments([]);
-        }
+        setCompanies(
+          companiesRes.success && companiesRes.data ? companiesRes.data : []
+        );
+        setProviders(
+          providersRes.success && providersRes.data ? providersRes.data : []
+        );
+        setServices(
+          servicesRes.success && servicesRes.data ? servicesRes.data : []
+        );
+        setAppointments(
+          appointmentsRes.success && appointmentsRes.data
+            ? appointmentsRes.data
+            : []
+        );
 
         if (effectiveRole === "admin") {
-          if (usersRes.success && usersRes.data) {
-            setUsers(usersRes.data as User[]);
-          } else {
-            setUsers([]);
-          }
+          setUsers(
+            usersRes.success && usersRes.data ? (usersRes.data as User[]) : []
+          );
         } else {
           setUsers([]);
         }
@@ -124,9 +113,9 @@ function App() {
     [currentUser?.role]
   );
 
-  // System settings - Simplified time slots
+  // Simplified time slots
   const [availableTimeSlots] = useState(() => {
-    const slots = [];
+    const slots: string[] = [];
     for (let hour = 6; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 15) {
         const time = `${hour.toString().padStart(2, "0")}:${minute
@@ -147,80 +136,54 @@ function App() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
-  // Utility functions
   const calculateEndTime = (startTime: string, duration: number) => {
     const [hours, minutes] = startTime.split(":").map(Number);
     const startMinutes = hours * 60 + minutes;
     const endMinutes = startMinutes + duration;
     const endHours = Math.floor(endMinutes / 60);
     const remainingMinutes = endMinutes % 60;
-
     return `${endHours.toString().padStart(2, "0")}:${remainingMinutes
       .toString()
       .padStart(2, "0")}`;
   };
 
-  // 🎯 NOVA FUNÇÃO: Verificar se é página pública de agendamento
+  // Public booking helpers
   const isPublicBookingPage = () => {
     try {
       const path = window.location.pathname;
-      console.log("🔍 Verificando path:", path); // Debug log
-      console.log("🌐 URL completa:", window.location.href); // Debug log
-
-      // Verificar se é uma rota de agendamento público
       const isBookingRoute =
         path.startsWith("/agendamento/") &&
         path.length > "/agendamento/".length;
-
-      // Verificar se o token é válido
       if (isBookingRoute) {
         const token = path.split("/agendamento/")[1];
-        console.log("🎫 Token extraído da URL:", token); // Debug log
         try {
           const decoded = atob(token);
-          // Verificar se é um token válido (deve ser um ID simples)
-          const isValidToken =
-            decoded && decoded.length > 0 && !decoded.includes(" ");
-          console.log("🎫 Token válido:", isValidToken, decoded);
-          return isValidToken;
+          return decoded && decoded.length > 0 && !decoded.includes(" ");
         } catch {
-          console.log("❌ Token inválido:", token);
           return false;
         }
       }
-
-      console.log("❌ Não é rota de agendamento:", path);
       return false;
-    } catch (error) {
-      console.error("Erro ao verificar página pública:", error);
+    } catch {
       return false;
     }
   };
 
-  // 🎯 NOVA FUNÇÃO: Obter token da URL
   const getBookingToken = () => {
     try {
       const path = window.location.pathname;
-      const token = path.split("/agendamento/")[1];
-      console.log("🎫 Token extraído:", token); // Debug log
-      return token;
-    } catch (error) {
-      console.error("Erro ao extrair token:", error);
+      return path.split("/agendamento/")[1] || null;
+    } catch {
       return null;
     }
   };
 
-  // Employee management functions for companies
+  // Employees (company)
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find(
-      (item) => item.id === employeeData.companyId
-    );
+    const company = companies.find((c) => c.id === employeeData.companyId);
     if (!company) return;
 
-    const newEmployee: Employee = {
-      ...employeeData,
-      id: generateId(),
-    };
+    const newEmployee: Employee = { ...employeeData, id: generateId() };
 
     try {
       await apiService.updateCompany(employeeData.companyId, {
@@ -237,13 +200,11 @@ function App() {
     id: string,
     employeeData: Partial<Employee>
   ) => {
-    const company = companies.find((item) =>
-      item.employees.some((employee) => employee.id === id)
-    );
+    const company = companies.find((c) => c.employees.some((e) => e.id === id));
     if (!company) return;
 
-    const updatedEmployees = company.employees.map((employee) =>
-      employee.id === id ? { ...employee, ...employeeData } : employee
+    const updatedEmployees = company.employees.map((e) =>
+      e.id === id ? { ...e, ...employeeData } : e
     );
 
     try {
@@ -258,18 +219,12 @@ function App() {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este colaborador?")) {
-      return;
-    }
+    if (!confirm("Tem certeza que deseja excluir este colaborador?")) return;
 
-    const company = companies.find((item) =>
-      item.employees.some((employee) => employee.id === id)
-    );
+    const company = companies.find((c) => c.employees.some((e) => e.id === id));
     if (!company) return;
 
-    const updatedEmployees = company.employees.filter(
-      (employee) => employee.id !== id
-    );
+    const updatedEmployees = company.employees.filter((e) => e.id !== id);
 
     try {
       await apiService.updateCompany(company.id, {
@@ -282,14 +237,12 @@ function App() {
     }
   };
 
-  // 🔑 Novo handleLogin usando API real
+  // Auth
   const handleLogin = async (email: string, password: string) => {
     try {
       const response = await apiService.login(email, password);
-
       if (response.success && response.data) {
         const { user, token } = response.data;
-
         apiService.setAuthToken(token);
         await loadInitialData(user.role);
 
@@ -305,17 +258,12 @@ function App() {
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
 
-        if (mappedUser.role === "company") {
-          setActiveTab("dashboard");
-        } else if (mappedUser.role === "provider") {
-          setActiveTab("my-schedule");
-        } else {
-          setActiveTab("calendar");
-        }
+        if (mappedUser.role === "company") setActiveTab("dashboard");
+        else if (mappedUser.role === "provider") setActiveTab("my-schedule");
+        else setActiveTab("calendar");
 
         return { success: true as const };
       }
-
       const message = response.error || "Falha no login";
       return { success: false as const, message };
     } catch (error) {
@@ -345,22 +293,18 @@ function App() {
     setViewMode("day");
   };
 
-  // 🎯 NOVA FUNÇÃO: Handle company click no calendário
   const handleCompanyClick = (
     company: Company,
     date: string,
     time?: string
   ) => {
-    // Filtrar agendamentos da empresa na data/horário específico
     const companyAppointments = appointments.filter(
       (apt) =>
         apt.companyId === company.id &&
         apt.date === date &&
         (!time || apt.startTime === time)
     );
-
     if (companyAppointments.length > 0) {
-      // Mostrar detalhes da empresa e agendamentos
       alert(
         `🏢 ${company.name}\n📅 ${new Date(date).toLocaleDateString(
           "pt-BR"
@@ -411,7 +355,6 @@ function App() {
           notes: appointmentData.notes ?? null,
         });
       }
-
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao salvar agendamento:", error);
@@ -446,7 +389,6 @@ function App() {
     }
   };
 
-  // 🎯 NOVA FUNÇÃO: Atualizar múltiplos agendamentos de uma vez
   const handleUpdateMultipleAppointments = async (
     appointmentIds: string[],
     updateData: Partial<Appointment>
@@ -462,10 +404,8 @@ function App() {
     }
   };
 
-  // 🎯 NOVA FUNÇÃO: Excluir múltiplos agendamentos de uma vez
   const handleDeleteMultipleAppointments = async (appointmentIds: string[]) => {
     if (appointmentIds.length === 0) return;
-
     try {
       await apiService.deleteAppointments(appointmentIds);
       await loadInitialData();
@@ -477,7 +417,6 @@ function App() {
 
   const handleAdminSchedulingSubmit = async (scheduleData: any) => {
     const { companyId, date, slots, chairs } = scheduleData;
-
     try {
       await Promise.all(
         slots.map(async (slot: any) => {
@@ -512,7 +451,6 @@ function App() {
     }
   };
 
-  // 🎯 FUNÇÃO: Handle company booking (update existing appointment em backend)
   const handleCompanyBookAppointment = async (
     appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -520,8 +458,7 @@ function App() {
       const existingSlot = appointments.find((apt) => {
         const sameService = appointmentData.serviceId
           ? apt.serviceId === appointmentData.serviceId
-          : apt.service === appointmentData.service;
-
+          : apt.service === (appointmentData as any).service;
         return (
           apt.companyId === appointmentData.companyId &&
           apt.date === appointmentData.date &&
@@ -552,7 +489,6 @@ function App() {
           notes: appointmentData.notes,
         });
       }
-
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao registrar agendamento da empresa:", error);
@@ -560,7 +496,6 @@ function App() {
     }
   };
 
-  // 🎯 NOVA FUNÇÃO: Handle public booking (atualizar slot existente)
   const handlePublicBookAppointment = async (appointmentData: {
     id: string;
     employeeId?: string;
@@ -572,11 +507,9 @@ function App() {
         notes: appointmentData.notes,
         status: "confirmed",
       });
-
       await loadInitialData();
-
       alert(
-        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa."
+        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado."
       );
     } catch (error) {
       console.error("Erro ao confirmar agendamento público:", error);
@@ -584,20 +517,14 @@ function App() {
     }
   };
 
-  // 🎯 NOVA FUNÇÃO: Handle add employee from public booking
   const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find(
-      (item) => item.id === employeeData.companyId
-    );
+    const company = companies.find((c) => c.id === employeeData.companyId);
     if (!company) {
       alert("Empresa não encontrada para associar o colaborador.");
       return "";
     }
 
-    const newEmployee: Employee = {
-      ...employeeData,
-      id: generateId(),
-    };
+    const newEmployee: Employee = { ...employeeData, id: generateId() };
 
     setCompanies((prev) =>
       prev.map((item) =>
@@ -620,26 +547,8 @@ function App() {
 
     return newEmployee.id;
   };
-  // 🎯 NOVA LÓGICA: Renderizar página pública de agendamento
-  if (isPublicBookingPage()) {
-    const token = getBookingToken();
-    if (token) {
-      return (
-        <PublicBooking
-          companyToken={token}
-          companies={companies}
-          providers={providers}
-          services={services}
-          availableTimeSlots={availableTimeSlots}
-          appointments={appointments} // 🎯 NOVA PROP: Passar appointments para verificar slots
-          onBookAppointment={handlePublicBookAppointment}
-          onAddEmployee={handleAddEmployeeFromPublic}
-        />
-      );
-    }
-  }
 
-  // Provider management functions
+  // Providers
   const handleAddProvider = async (providerData: Omit<Provider, "id">) => {
     try {
       await apiService.createProvider({
@@ -672,10 +581,7 @@ function App() {
   };
 
   const handleDeleteProvider = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este prestador?")) {
-      return;
-    }
-
+    if (!confirm("Tem certeza que deseja excluir este prestador?")) return;
     try {
       await apiService.updateProvider(id, { isActive: false });
       await loadInitialData();
@@ -685,7 +591,26 @@ function App() {
     }
   };
 
-  // Company management functions
+  /** ✅ NOVA FUNÇÃO: alterar senha do prestador (usada pelo ProviderManagement) */
+  const handleChangeProviderPassword = async (
+    providerId: string,
+    password: string
+  ) => {
+    try {
+      const res = await apiService.changeProviderPassword({
+        providerId,
+        password,
+      });
+      if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
+      alert("Senha do prestador alterada com sucesso!");
+      await loadInitialData(currentUser?.role);
+    } catch (err) {
+      console.error("Erro ao alterar senha do prestador:", err);
+      alert("Não foi possível alterar a senha do prestador. Tente novamente.");
+    }
+  };
+
+  // Companies
   const handleAddCompany = async (
     companyData: Omit<Company, "id">,
     options?: { password?: string }
@@ -742,10 +667,7 @@ function App() {
   };
 
   const handleDeleteCompany = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta empresa?")) {
-      return;
-    }
-
+    if (!confirm("Tem certeza que deseja excluir esta empresa?")) return;
     try {
       await apiService.updateCompany(id, { isActive: false });
       await loadInitialData();
@@ -754,13 +676,14 @@ function App() {
       alert("Não foi possível excluir a empresa. Tente novamente.");
     }
   };
-  // Alterar senha da empresa
+
+  // ✅ Alterar senha da empresa
   const handleChangeCompanyPassword = async (
     companyId: string,
     password: string
   ) => {
     try {
-      const res = await apiService.changeCompanyPassword(companyId, password); // ✅ usa o endpoint correto
+      const res = await apiService.changeCompanyPassword(companyId, password);
       if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
       alert("Senha alterada com sucesso!");
       await loadInitialData(currentUser?.role);
@@ -770,7 +693,7 @@ function App() {
     }
   };
 
-  // Service management functions
+  // Services
   const handleAddService = async (
     serviceData: Omit<Service, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -802,10 +725,7 @@ function App() {
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este serviço?")) {
-      return;
-    }
-
+    if (!confirm("Tem certeza que deseja excluir este serviço?")) return;
     try {
       await apiService.deleteService(id);
       await loadInitialData();
@@ -815,7 +735,7 @@ function App() {
     }
   };
 
-  // Admin management functions
+  // Admin users
   const handleAddAdmin = async (
     adminData: Omit<User, "id" | "createdAt" | "updatedAt"> & {
       password?: string;
@@ -850,10 +770,7 @@ function App() {
   };
 
   const handleDeleteAdmin = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este administrador?")) {
-      return;
-    }
-
+    if (!confirm("Tem certeza que deseja excluir este administrador?")) return;
     try {
       await apiService.updateUser(id, { isActive: false });
       await loadInitialData();
@@ -874,9 +791,8 @@ function App() {
 
   const getFilteredData = () => {
     if (!currentUser) return { appointments: [], companies: [], employees: [] };
-
     switch (currentUser.role) {
-      case "company":
+      case "company": {
         const userCompany = companies.find(
           (c) => c.id === currentUser.companyId
         );
@@ -887,6 +803,7 @@ function App() {
           companies: userCompany ? [userCompany] : [],
           employees: userCompany ? userCompany.employees : [],
         };
+      }
       case "provider":
         return {
           appointments: appointments.filter(
@@ -906,10 +823,8 @@ function App() {
 
   const renderMainContent = () => {
     if (!currentUser) return null;
-
     const filteredData = getFilteredData();
 
-    // Company Dashboard
     if (currentUser.role === "company") {
       const userCompany = companies.find((c) => c.id === currentUser.companyId);
       if (!userCompany) return <div>Empresa não encontrada</div>;
@@ -932,7 +847,6 @@ function App() {
       );
     }
 
-    // Provider Dashboard
     if (currentUser.role === "provider" && activeTab === "my-schedule") {
       const provider = providers.find((p) => p.id === currentUser.id);
       if (!provider) return <div>Prestador não encontrado</div>;
@@ -948,7 +862,6 @@ function App() {
       );
     }
 
-    // Admin views
     switch (activeTab) {
       case "calendar":
         return (
@@ -1028,7 +941,7 @@ function App() {
           />
         );
 
-      case "admins":
+      case "admins": {
         const adminUsers = users.filter((user) => user.role === "admin");
         return (
           <AdminManagement
@@ -1036,9 +949,10 @@ function App() {
             onAddAdmin={handleAddAdmin}
             onUpdateAdmin={handleUpdateAdmin}
             onDeleteAdmin={handleDeleteAdmin}
-            currentUserId={currentUser.id}
+            currentUserId={currentUser!.id}
           />
         );
+      }
 
       case "reports":
         return (
@@ -1053,7 +967,6 @@ function App() {
         return (
           <LogoCustomization
             onSave={(config) => {
-              // Aplicar configurações no sistema
               console.log("✅ Configurações de logo aplicadas:", config);
             }}
           />
