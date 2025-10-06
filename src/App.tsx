@@ -430,7 +430,7 @@ function App() {
             companyId,
             providerId: slot.providerId,
             serviceId: slot.serviceId,
-            clientId: companyId,
+            clientId: null,
             employeeId: null,
             date,
             startTime: slot.time,
