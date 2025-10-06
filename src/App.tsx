@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "./components/Layout/Header";
 import Sidebar from "./components/Layout/Sidebar";
 import CalendarHeader from "./components/Calendar/CalendarHeader";
@@ -177,6 +177,13 @@ function App() {
       return null;
     }
   };
+
+  // 🔄 Carrega dados automaticamente quando for rota pública
+  useEffect(() => {
+    if (isPublicBookingPage()) {
+      loadInitialData();
+    }
+  }, [loadInitialData]);
 
   // Employees (company)
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
@@ -591,7 +598,7 @@ function App() {
     }
   };
 
-  /** ✅ NOVA FUNÇÃO: alterar senha do prestador (usada pelo ProviderManagement) */
+  /** alterar senha do prestador */
   const handleChangeProviderPassword = async (
     providerId: string,
     password: string
@@ -677,7 +684,7 @@ function App() {
     }
   };
 
-  // ✅ Alterar senha da empresa
+  // Alterar senha da empresa
   const handleChangeCompanyPassword = async (
     companyId: string,
     password: string
@@ -988,6 +995,23 @@ function App() {
         );
     }
   };
+
+  // ✅ Early return da página pública ANTES do check de autenticação
+  if (isPublicBookingPage()) {
+    const token = getBookingToken();
+    return (
+      <PublicBooking
+        companyToken={token!}
+        companies={companies}
+        providers={providers}
+        services={services}
+        availableTimeSlots={availableTimeSlots}
+        appointments={appointments}
+        onBookAppointment={handlePublicBookAppointment}
+        onAddEmployee={handleAddEmployeeFromPublic}
+      />
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
