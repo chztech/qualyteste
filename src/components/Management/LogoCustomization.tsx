@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Upload, Save, RotateCcw, Monitor, Smartphone } from "lucide-react";
-// ⬇️ novo: usar o serviço que persiste no backend
-import logoConfigService from "../../services/logoConfigService";
+import logoConfigService, {
+  LogoConfig,
+} from "../../services/logoConfigService";
 
 type LogoBlockConfig = {
   imageUrl: string;
   width: number;
   height: number;
-  backgroundColor: string; // ex: 'blue-600' | 'transparent'
-  borderRadius: string; // ex: 'rounded-xl'
-  padding: string; // ex: 'p-6'
+  backgroundColor: string;
+  borderRadius: string;
+  padding: string;
   showBackground: boolean;
 };
 
@@ -102,28 +103,82 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
   const setCurrentConfig =
     activeTab === "login" ? setLoginConfig : setPublicConfig;
 
-  // ⬇️ Boot: tenta backend, depois localStorage, senão DEFAULTS
+  // util: normaliza resposta do backend para {login, public}
+  function normalizeResponse(
+    payload: LogoConfig[] | { login: LogoConfig; public: LogoConfig }
+  ): LogoCustomizationPayload {
+    if (Array.isArray(payload)) {
+      const login = payload.find((c) => c.context === "login");
+      const pub = payload.find((c) => c.context === "public");
+      return {
+        login: {
+          imageUrl: login?.imageUrl ?? DEFAULTS.login.imageUrl,
+          width: login?.width ?? DEFAULTS.login.width,
+          height: login?.height ?? DEFAULTS.login.height,
+          backgroundColor:
+            login?.backgroundColor ?? DEFAULTS.login.backgroundColor,
+          borderRadius: login?.borderRadius ?? DEFAULTS.login.borderRadius,
+          padding: login?.padding ?? DEFAULTS.login.padding,
+          showBackground:
+            login?.showBackground ?? DEFAULTS.login.showBackground,
+        },
+        public: {
+          imageUrl: pub?.imageUrl ?? DEFAULTS.public.imageUrl,
+          width: pub?.width ?? DEFAULTS.public.width,
+          height: pub?.height ?? DEFAULTS.public.height,
+          backgroundColor:
+            pub?.backgroundColor ?? DEFAULTS.public.backgroundColor,
+          borderRadius: pub?.borderRadius ?? DEFAULTS.public.borderRadius,
+          padding: pub?.padding ?? DEFAULTS.public.padding,
+          showBackground: pub?.showBackground ?? DEFAULTS.public.showBackground,
+        },
+      };
+    }
+    return {
+      login: {
+        imageUrl: payload.login?.imageUrl ?? DEFAULTS.login.imageUrl,
+        width: payload.login?.width ?? DEFAULTS.login.width,
+        height: payload.login?.height ?? DEFAULTS.login.height,
+        backgroundColor:
+          payload.login?.backgroundColor ?? DEFAULTS.login.backgroundColor,
+        borderRadius:
+          payload.login?.borderRadius ?? DEFAULTS.login.borderRadius,
+        padding: payload.login?.padding ?? DEFAULTS.login.padding,
+        showBackground:
+          payload.login?.showBackground ?? DEFAULTS.login.showBackground,
+      },
+      public: {
+        imageUrl: payload.public?.imageUrl ?? DEFAULTS.public.imageUrl,
+        width: payload.public?.width ?? DEFAULTS.public.width,
+        height: payload.public?.height ?? DEFAULTS.public.height,
+        backgroundColor:
+          payload.public?.backgroundColor ?? DEFAULTS.public.backgroundColor,
+        borderRadius:
+          payload.public?.borderRadius ?? DEFAULTS.public.borderRadius,
+        padding: payload.public?.padding ?? DEFAULTS.public.padding,
+        showBackground:
+          payload.public?.showBackground ?? DEFAULTS.public.showBackground,
+      },
+    };
+  }
+
+  // boot: backend → cache local → defaults
   useEffect(() => {
     (async () => {
       try {
-        const res = await logoConfigService.getLogoConfig();
+        const res = await logoConfigService.getLogoConfigs(); // ✅ plural
         if (res.success && res.data) {
-          const cfg = res.data as LogoCustomizationPayload;
-          setLoginConfig({ ...DEFAULTS.login, ...(cfg.login ?? {}) });
-          setPublicConfig({ ...DEFAULTS.public, ...(cfg.public ?? {}) });
-          // também guarda no localStorage como cache
-          localStorage.setItem("logoCustomization", JSON.stringify(cfg));
+          const norm = normalizeResponse(res.data as any);
+          setLoginConfig(norm.login);
+          setPublicConfig(norm.public);
+          localStorage.setItem("logoCustomization", JSON.stringify(norm));
           setBooting(false);
           return;
         }
       } catch (e) {
-        console.warn(
-          "Falha ao buscar config no backend, usando cache/local:",
-          e
-        );
+        console.warn("Falha ao buscar config no backend:", e);
       }
 
-      // Fallback: cache local
       const saved = localStorage.getItem("logoCustomization");
       if (saved) {
         try {
@@ -132,12 +187,9 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
           setPublicConfig({ ...DEFAULTS.public, ...(cfg.public ?? {}) });
           setBooting(false);
           return;
-        } catch {
-          // ignore parse error and use defaults
-        }
+        } catch {}
       }
 
-      // Fallback final: defaults
       setLoginConfig(DEFAULTS.login);
       setPublicConfig(DEFAULTS.public);
       setBooting(false);
@@ -147,7 +199,6 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageUrl = e.target?.result as string;
@@ -164,34 +215,28 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
     };
 
     try {
-      // salvar no backend
-      const res = await logoConfigService.saveLogoConfig(payload);
-      if (!res.success) {
-        throw new Error(res.error || "Falha ao salvar configurações");
-      }
+      const res = await logoConfigService.saveLogoConfigs({
+        login: { context: "login", ...payload.login },
+        public: { context: "public", ...payload.public },
+      }); // ✅ plural
 
-      // cache local para abrir mais rápido depois
+      if (!res.success) throw new Error(res.error || "Falha ao salvar");
+
       localStorage.setItem("logoCustomization", JSON.stringify(payload));
-
       onSave?.(payload);
-      alert("✅ Configurações de logo salvas e aplicadas no sistema!");
+      alert("✅ Configurações salvas!");
     } catch (error) {
-      console.error("❌ Erro ao salvar configurações:", error);
-      alert("❌ Erro ao salvar configurações. Tente novamente.");
+      console.error("Erro ao salvar configurações:", error);
+      alert("❌ Não foi possível salvar. Tente novamente.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleReset = () => {
-    if (!confirm("Tem certeza que deseja restaurar as configurações padrão?")) {
-      return;
-    }
-    if (activeTab === "login") {
-      setLoginConfig(DEFAULTS.login);
-    } else {
-      setPublicConfig(DEFAULTS.public);
-    }
+    if (!confirm("Restaurar as configurações padrão desta aba?")) return;
+    if (activeTab === "login") setLoginConfig(DEFAULTS.login);
+    else setPublicConfig(DEFAULTS.public);
   };
 
   if (booting) {
@@ -204,17 +249,16 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
             Personalização de Logo
           </h2>
           <p className="text-gray-600 mt-1">
-            Configure a aparência da logo na tela de login e no link público
+            Configure a logo da tela de login e do link público
           </p>
         </div>
-
         <div className="flex space-x-3">
           <button
             onClick={handleReset}
@@ -234,7 +278,7 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
@@ -263,14 +307,13 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
 
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Configurações */}
+            {/* form */}
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-900">
-                Configurações —{" "}
                 {activeTab === "login" ? "Tela de Login" : "Link Público"}
               </h3>
 
-              {/* Upload de Imagem */}
+              {/* upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Imagem da Logo
@@ -305,7 +348,7 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
                 </div>
               </div>
 
-              {/* Dimensões */}
+              {/* dimensões */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -345,7 +388,7 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
                 </div>
               </div>
 
-              {/* Mostrar Fundo */}
+              {/* fundo */}
               <div>
                 <label className="flex items-center space-x-2">
                   <input
@@ -365,88 +408,83 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
                 </label>
               </div>
 
-              {/* Cor de Fundo */}
               {currentConfig.showBackground && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cor de Fundo
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {colorOptions.map((color) => (
-                      <button
-                        key={color.value}
-                        onClick={() =>
-                          setCurrentConfig((prev) => ({
-                            ...prev,
-                            backgroundColor: color.value,
-                          }))
-                        }
-                        className={`flex items-center space-x-2 p-2 rounded-lg border-2 transition-colors ${
-                          currentConfig.backgroundColor === color.value
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded ${color.bg}`}></div>
-                        <span className="text-xs">{color.name}</span>
-                      </button>
-                    ))}
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Cor de Fundo
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {colorOptions.map((color) => (
+                        <button
+                          key={color.value}
+                          onClick={() =>
+                            setCurrentConfig((prev) => ({
+                              ...prev,
+                              backgroundColor: color.value,
+                            }))
+                          }
+                          className={`flex items-center space-x-2 p-2 rounded-lg border-2 transition-colors ${
+                            currentConfig.backgroundColor === color.value
+                              ? "border-blue-500 bg-blue-50"
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded ${color.bg}`} />
+                          <span className="text-xs">{color.name}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Bordas Arredondadas */}
-              {currentConfig.showBackground && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Bordas Arredondadas
-                  </label>
-                  <select
-                    value={currentConfig.borderRadius}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        borderRadius: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {borderRadiusOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bordas Arredondadas
+                    </label>
+                    <select
+                      value={currentConfig.borderRadius}
+                      onChange={(e) =>
+                        setCurrentConfig((prev) => ({
+                          ...prev,
+                          borderRadius: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {borderRadiusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Espaçamento Interno */}
-              {currentConfig.showBackground && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Espaçamento Interno
-                  </label>
-                  <select
-                    value={currentConfig.padding}
-                    onChange={(e) =>
-                      setCurrentConfig((prev) => ({
-                        ...prev,
-                        padding: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    {paddingOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Espaçamento Interno
+                    </label>
+                    <select
+                      value={currentConfig.padding}
+                      onChange={(e) =>
+                        setCurrentConfig((prev) => ({
+                          ...prev,
+                          padding: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      {paddingOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
             </div>
 
-            {/* Preview */}
+            {/* preview */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Preview</h3>
@@ -530,7 +568,6 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
                 </div>
               </div>
 
-              {/* Info */}
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">
                   Configurações Atuais:
@@ -559,16 +596,14 @@ export default function LogoCustomization({ onSave }: LogoCustomizationProps) {
                 </div>
               </div>
 
-              {/* Dica */}
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-medium text-green-900 mb-2">
-                  ✅ Como aplicar
-                </h4>
+                <h4 className="font-medium text-green-900 mb-2">✅ Dica</h4>
                 <ol className="text-sm text-green-800 space-y-1">
                   <li>1. Ajuste a logo como preferir</li>
                   <li>2. Veja o preview ao lado</li>
-                  <li>3. Clique em “Salvar Configurações”</li>
-                  <li>4. O sistema usa o backend para persistir</li>
+                  <li>
+                    3. Clique em “Salvar Configurações” (persiste no backend)
+                  </li>
                 </ol>
               </div>
             </div>
