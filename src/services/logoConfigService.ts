@@ -1,15 +1,14 @@
-// 🗄️ SERVIÇO DE CONFIGURAÇÃO DE LOGO COM MYSQL REMOTO
-// Sistema robusto para salvar configurações no banco de dados
+// 🗄️ SERVIÇO DE CONFIGURAÇÃO DE LOGO (persistência no backend)
 
 export interface LogoConfig {
-  id?: number;
-  context: 'login' | 'public';
+  id?: number | string;
+  context: "login" | "public";
   imageUrl: string;
   width: number;
   height: number;
-  backgroundColor: string;
-  borderRadius: string;
-  padding: string;
+  backgroundColor: string; // tailwind token ou hex
+  borderRadius: string; // ex.: 'rounded-lg'
+  padding: string; // ex.: 'p-4'
   showBackground: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -17,281 +16,230 @@ export interface LogoConfig {
 
 export interface LogoConfigResponse {
   success: boolean;
-  data?: LogoConfig[];
+  data?: LogoConfig[] | { login: LogoConfig; public: LogoConfig };
   error?: string;
+  message?: string;
+}
+
+function normalizeBaseUrl(u: string): string {
+  if (!u) return "";
+  return u.endsWith("/") ? u.slice(0, -1) : u;
+}
+
+function joinUrl(base: string, endpoint: string): string {
+  const e = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return `${normalizeBaseUrl(base)}${e}`;
+}
+
+async function parseJsonSafe(res: Response) {
+  const txt = await res.text();
+  if (!txt) return { ok: false, data: null, raw: "", status: res.status };
+  try {
+    return { ok: true, data: JSON.parse(txt), raw: txt, status: res.status };
+  } catch {
+    return { ok: false, data: null, raw: txt, status: res.status };
+  }
 }
 
 class LogoConfigService {
   private baseUrl: string;
-  private apiKey: string;
-  private dbConfig: {
-    host: string;
-    port: number;
-    database: string;
-    user: string;
-    password: string;
-    ssl: boolean;
-  };
 
   constructor() {
-    // 🔧 CONFIGURAÇÃO DO MYSQL REMOTO - USANDO VARIÁVEIS DO .env
-    this.baseUrl = import.meta.env.VITE_API_URL || 'https://api.qualycorpore.com';
-    this.apiKey = import.meta.env.VITE_API_KEY || 'demo-key';
-    
-    this.dbConfig = {
-      host: import.meta.env.VITE_DB_HOST || 'localhost',
-      port: Number(import.meta.env.VITE_DB_PORT) || 3306,
-      database: import.meta.env.VITE_DB_NAME || 'qualycorpore_db',
-      user: import.meta.env.VITE_DB_USER || 'root',
-      password: import.meta.env.VITE_DB_PASS || '',
-      ssl: import.meta.env.VITE_DB_SSL === 'true'
-    };
-    
-    // 🔍 LOG DE CONFIGURAÇÃO (APENAS EM DESENVOLVIMENTO)
-    if (import.meta.env.VITE_DEBUG_MODE === 'true') {
-      console.log('🔧 MySQL Config:', {
-        host: this.dbConfig.host,
-        port: this.dbConfig.port,
-        database: this.dbConfig.database,
-        user: this.dbConfig.user,
-        ssl: this.dbConfig.ssl
-        // Não logar senha por segurança
-      });
-    }
+    // use o mesmo base da sua API PHP
+    this.baseUrl =
+      (import.meta.env.VITE_API_BASE_URL as string) ??
+      "https://qualycorpore.chztech.com.br/api";
   }
 
-  // 🔍 BUSCAR CONFIGURAÇÕES DO BANCO
+  private authHeaders(): HeadersInit {
+    const token = localStorage.getItem("authToken");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  // ---- GET /branding/index.php --------------------------------------------
   async getLogoConfigs(): Promise<LogoConfigResponse> {
     try {
-      console.log('🔍 Buscando configurações de logo no MySQL...');
-      
-      // 🎯 SIMULAÇÃO: Em produção seria uma requisição real
-      const response = await this.simulateApiCall('GET', '/api/logo-configs');
-      
-      if (response.success) {
-        console.log('✅ Configurações carregadas do MySQL:', response.data);
-        return response;
-      } else {
-        console.error('❌ Erro ao carregar configurações:', response.error);
-        return this.getFallbackConfigs();
-      }
-    } catch (error) {
-      console.error('❌ Erro de conexão com MySQL:', error);
-      return this.getFallbackConfigs();
-    }
-  }
+      const url = joinUrl(this.baseUrl, "/branding/index.php");
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders(),
+        },
+        credentials: "include",
+        mode: "cors",
+      });
 
-  // 💾 SALVAR CONFIGURAÇÕES NO BANCO
-  async saveLogoConfigs(configs: { login: LogoConfig; public: LogoConfig }): Promise<LogoConfigResponse> {
-    try {
-      console.log('💾 Salvando configurações no MySQL...', configs);
-      
-      // 🎯 PREPARAR DADOS PARA O BANCO
-      const dataToSave = [
-        { ...configs.login, context: 'login' as const },
-        { ...configs.public, context: 'public' as const }
-      ];
-
-      // 🎯 SIMULAÇÃO: Em produção seria uma requisição real
-      const response = await this.simulateApiCall('POST', '/api/logo-configs', dataToSave);
-      
-      if (response.success) {
-        console.log('✅ Configurações salvas no MySQL com sucesso!');
-        
-        // 🔄 BACKUP LOCAL (fallback)
-        localStorage.setItem('logoConfigBackup', JSON.stringify(configs));
-        
-        return response;
-      } else {
-        console.error('❌ Erro ao salvar no MySQL:', response.error);
-        throw new Error(response.error);
+      const parsed = await parseJsonSafe(res);
+      if (!parsed.ok) {
+        return {
+          success: false,
+          error: `Resposta não-JSON (${parsed.status})`,
+          message: parsed.raw,
+        };
       }
-    } catch (error) {
-      console.error('❌ Erro ao salvar configurações:', error);
-      
-      // 🔄 FALLBACK: Salvar localmente se MySQL falhar
-      localStorage.setItem('logoConfigBackup', JSON.stringify(configs));
-      
+
+      const body = parsed.data;
+      // backend pode responder { success, data } ou já só o array
+      if (res.ok && (body?.success ?? true)) {
+        const payload = body?.data ?? body;
+        // Aceitar dois formatos:
+        // 1) [{context:'login'...}, {context:'public'...}]
+        // 2) { login: {...}, public: {...} }
+        if (Array.isArray(payload)) {
+          return { success: true, data: payload as LogoConfig[] };
+        }
+        return {
+          success: true,
+          data: payload as { login: LogoConfig; public: LogoConfig },
+        };
+      }
+
       return {
         success: false,
-        error: `Erro de conexão com MySQL: ${error}`
+        error: body?.error || body?.message || `Erro HTTP ${parsed.status}`,
       };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Falha de rede" };
     }
   }
 
-  // 🗑️ RESETAR CONFIGURAÇÕES (VOLTAR AO PADRÃO)
+  // ---- POST /branding/save.php --------------------------------------------
+  async saveLogoConfigs(configs: {
+    login: LogoConfig;
+    public: LogoConfig;
+  }): Promise<LogoConfigResponse> {
+    try {
+      const url = joinUrl(this.baseUrl, "/branding/save.php");
+
+      // o backend pode esperar um array ou um objeto
+      // aqui enviaremos um objeto com chaves login/public
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders(),
+        },
+        credentials: "include",
+        mode: "cors",
+        body: JSON.stringify({
+          login: { ...configs.login, context: "login" },
+          public: { ...configs.public, context: "public" },
+        }),
+      });
+
+      const parsed = await parseJsonSafe(res);
+      if (!parsed.ok) {
+        return {
+          success: false,
+          error: `Resposta não-JSON (${parsed.status})`,
+          message: parsed.raw,
+        };
+      }
+
+      const body = parsed.data;
+      if (res.ok && (body?.success ?? true)) {
+        return {
+          success: true,
+          data: body?.data ?? { login: configs.login, public: configs.public },
+          message: body?.message,
+        };
+      }
+
+      return {
+        success: false,
+        error: body?.error || body?.message || "Falha ao salvar",
+      };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Falha de rede" };
+    }
+  }
+
+  // ---- POST /branding/reset.php -------------------------------------------
   async resetToDefault(): Promise<LogoConfigResponse> {
     try {
-      console.log('🔄 Resetando configurações para padrão...');
-      
-      const defaultConfigs = this.getDefaultConfigs();
-      return await this.saveLogoConfigs(defaultConfigs);
-    } catch (error) {
-      console.error('❌ Erro ao resetar configurações:', error);
+      const url = joinUrl(this.baseUrl, "/branding/reset.php");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders(),
+        },
+        credentials: "include",
+        mode: "cors",
+        body: JSON.stringify({}), // caso precise de payload
+      });
+
+      const parsed = await parseJsonSafe(res);
+      if (!parsed.ok) {
+        return {
+          success: false,
+          error: `Resposta não-JSON (${parsed.status})`,
+          message: parsed.raw,
+        };
+      }
+
+      const body = parsed.data;
+      if (res.ok && (body?.success ?? true)) {
+        return { success: true, data: body?.data, message: body?.message };
+      }
       return {
         success: false,
-        error: `Erro ao resetar: ${error}`
+        error: body?.error || body?.message || "Falha ao resetar",
       };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Falha de rede" };
     }
   }
 
-  // 📊 OBTER HISTÓRICO DE CONFIGURAÇÕES
+  // ---- GET /branding/history.php ------------------------------------------
   async getConfigHistory(): Promise<LogoConfigResponse> {
     try {
-      console.log('📊 Buscando histórico de configurações...');
-      
-      const response = await this.simulateApiCall('GET', '/api/logo-configs/history');
-      return response;
-    } catch (error) {
-      console.error('❌ Erro ao buscar histórico:', error);
+      const url = joinUrl(this.baseUrl, "/branding/history.php");
+      const res = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders(),
+        },
+        credentials: "include",
+        mode: "cors",
+      });
+
+      const parsed = await parseJsonSafe(res);
+      if (!parsed.ok) {
+        return {
+          success: false,
+          error: `Resposta não-JSON (${parsed.status})`,
+          message: parsed.raw,
+        };
+      }
+
+      const body = parsed.data;
+      if (res.ok && (body?.success ?? true)) {
+        return { success: true, data: body?.data, message: body?.message };
+      }
       return {
         success: false,
-        error: `Erro ao buscar histórico: ${error}`
+        error: body?.error || body?.message || "Falha ao buscar histórico",
       };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Falha de rede" };
     }
   }
 
-  // 🎯 SIMULAÇÃO DE API (SUBSTITUIR POR REQUISIÇÕES REAIS)
-  private async simulateApiCall(method: string, endpoint: string, data?: any): Promise<LogoConfigResponse> {
-    // 🔄 SIMULAR DELAY DE REDE
-    await new Promise(resolve => setTimeout(resolve, 500));
-
+  // ---- teste simples -------------------------------------------------------
+  async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      if (method === 'GET' && endpoint === '/api/logo-configs') {
-        // 🔍 SIMULAR BUSCA NO MYSQL
-        const savedConfigs = localStorage.getItem('logoConfigMySQL');
-        
-        if (savedConfigs) {
-          const configs = JSON.parse(savedConfigs);
-          return {
-            success: true,
-            data: [
-              { id: 1, context: 'login', ...configs.login, createdAt: new Date().toISOString() },
-              { id: 2, context: 'public', ...configs.public, createdAt: new Date().toISOString() }
-            ]
-          };
-        } else {
-          return this.getFallbackConfigs();
-        }
-      }
-
-      if (method === 'POST' && endpoint === '/api/logo-configs') {
-        // 💾 SIMULAR SALVAMENTO NO MYSQL
-        const configsToSave = {
-          login: data.find((config: LogoConfig) => config.context === 'login'),
-          public: data.find((config: LogoConfig) => config.context === 'public')
-        };
-
-        // 🎯 SIMULAR SALVAMENTO (em produção seria INSERT/UPDATE no MySQL)
-        localStorage.setItem('logoConfigMySQL', JSON.stringify(configsToSave));
-        
-        return {
-          success: true,
-          data: data.map((config: LogoConfig, index: number) => ({
-            ...config,
-            id: index + 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }))
-        };
-      }
-
-      if (method === 'GET' && endpoint === '/api/logo-configs/history') {
-        // 📊 SIMULAR HISTÓRICO
-        return {
-          success: true,
-          data: [
-            {
-              id: 1,
-              context: 'login' as const,
-              imageUrl: '/logo_qualy.png',
-              width: 80,
-              height: 80,
-              backgroundColor: 'blue-600',
-              borderRadius: 'rounded-lg',
-              padding: 'p-4',
-              showBackground: true,
-              createdAt: new Date().toISOString()
-            }
-          ]
-        };
-      }
-
-      return { success: false, error: 'Endpoint não encontrado' };
-    } catch (error) {
-      return { success: false, error: `Erro na simulação: ${error}` };
-    }
-  }
-
-  // 🔄 CONFIGURAÇÕES PADRÃO
-  private getDefaultConfigs() {
-    return {
-      login: {
-        imageUrl: '/logo_qualy.png',
-        width: 80,
-        height: 80,
-        backgroundColor: 'blue-600',
-        borderRadius: 'rounded-lg',
-        padding: 'p-4',
-        showBackground: true
-      },
-      public: {
-        imageUrl: '/logo_qualy.png',
-        width: 100,
-        height: 100,
-        backgroundColor: 'blue-600',
-        borderRadius: 'rounded-xl',
-        padding: 'p-6',
-        showBackground: true
-      }
-    };
-  }
-
-  // 🔄 CONFIGURAÇÕES DE FALLBACK
-  private getFallbackConfigs(): LogoConfigResponse {
-    console.log('🔄 Usando configurações padrão (fallback)');
-    
-    const defaultConfigs = this.getDefaultConfigs();
-    
-    return {
-      success: true,
-      data: [
-        { id: 1, context: 'login' as const, ...defaultConfigs.login, createdAt: new Date().toISOString() },
-        { id: 2, context: 'public' as const, ...defaultConfigs.public, createdAt: new Date().toISOString() }
-      ]
-    };
-  }
-
-  // 🔧 TESTAR CONEXÃO COM MYSQL
-  async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
-    try {
-      console.log('🔧 Testando conexão com MySQL...');
-      
-      const startTime = Date.now();
-      const response = await this.simulateApiCall('GET', '/api/health');
-      const responseTime = Date.now() - startTime;
-
-      return {
-        success: true,
-        message: `Conexão com MySQL estabelecida com sucesso! (${responseTime}ms)`,
-        details: {
-          server: this.baseUrl,
-          responseTime: `${responseTime}ms`,
-          status: 'Connected',
-          database: 'qualycorpore_db',
-          table: 'logo_configurations'
-        }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Erro de conexão com MySQL: ${error}`,
-        details: {
-          server: this.baseUrl,
-          status: 'Disconnected',
-          error: error
-        }
-      };
+      const url = joinUrl(this.baseUrl, "/branding/index.php");
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { ...this.authHeaders() },
+      });
+      if (res.ok) return { success: true, message: "OK" };
+      return { success: false, message: `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || "Falha de rede" };
     }
   }
 }
@@ -299,93 +247,77 @@ class LogoConfigService {
 // 🎯 INSTÂNCIA SINGLETON
 export const logoConfigService = new LogoConfigService();
 
-// 🔧 HOOK PERSONALIZADO PARA USAR O SERVIÇO
+// 🔧 HOOK para usar no React
+import * as React from "react";
+
 export const useLogoConfig = () => {
-  const [configs, setConfigs] = React.useState<{ login: LogoConfig; public: LogoConfig } | null>(null);
+  const [configs, setConfigs] = React.useState<{
+    login: LogoConfig;
+    public: LogoConfig;
+  } | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const coerceArrayToObject = (arr: LogoConfig[]) => {
+    const login = arr.find((c) => c.context === "login");
+    const pub = arr.find((c) => c.context === "public");
+    if (login && pub) return { login, public: pub };
+    return null;
+  };
 
   const loadConfigs = async () => {
     setLoading(true);
     setError(null);
-    
-    try {
-      const response = await logoConfigService.getLogoConfigs();
-      
-      if (response.success && response.data) {
-        const loginConfig = response.data.find(config => config.context === 'login');
-        const publicConfig = response.data.find(config => config.context === 'public');
-        
-        if (loginConfig && publicConfig) {
-          setConfigs({
-            login: loginConfig,
-            public: publicConfig
-          });
-        }
-      } else {
-        setError(response.error || 'Erro ao carregar configurações');
+    const res = await logoConfigService.getLogoConfigs();
+    if (res.success) {
+      if (Array.isArray(res.data)) {
+        const obj = coerceArrayToObject(res.data as LogoConfig[]);
+        if (obj) setConfigs(obj);
+      } else if (
+        res.data &&
+        (res.data as any).login &&
+        (res.data as any).public
+      ) {
+        setConfigs(res.data as { login: LogoConfig; public: LogoConfig });
       }
-    } catch (err) {
-      setError(`Erro de conexão: ${err}`);
-    } finally {
-      setLoading(false);
+    } else {
+      setError(res.error || "Erro ao carregar configurações");
     }
+    setLoading(false);
   };
 
-  const saveConfigs = async (newConfigs: { login: LogoConfig; public: LogoConfig }) => {
+  const saveConfigs = async (newConfigs: {
+    login: LogoConfig;
+    public: LogoConfig;
+  }) => {
     setLoading(true);
     setError(null);
-    
-    try {
-      const response = await logoConfigService.saveLogoConfigs(newConfigs);
-      
-      if (response.success) {
-        setConfigs(newConfigs);
-        return { success: true };
-      } else {
-        setError(response.error || 'Erro ao salvar configurações');
-        return { success: false, error: response.error };
-      }
-    } catch (err) {
-      const errorMsg = `Erro ao salvar: ${err}`;
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
+    const res = await logoConfigService.saveLogoConfigs(newConfigs);
+    if (res.success) {
+      setConfigs(newConfigs);
       setLoading(false);
+      return { success: true as const };
     }
+    setError(res.error || "Erro ao salvar configurações");
+    setLoading(false);
+    return { success: false as const, error: res.error };
   };
 
   const resetConfigs = async () => {
     setLoading(true);
     setError(null);
-    
-    try {
-      const response = await logoConfigService.resetToDefault();
-      
-      if (response.success) {
-        await loadConfigs(); // Recarregar configurações
-        return { success: true };
-      } else {
-        setError(response.error || 'Erro ao resetar configurações');
-        return { success: false, error: response.error };
-      }
-    } catch (err) {
-      const errorMsg = `Erro ao resetar: ${err}`;
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
+    const res = await logoConfigService.resetToDefault();
+    if (res.success) {
+      await loadConfigs();
       setLoading(false);
+      return { success: true as const };
     }
+    setError(res.error || "Erro ao resetar configurações");
+    setLoading(false);
+    return { success: false as const, error: res.error };
   };
 
-  return {
-    configs,
-    loading,
-    error,
-    loadConfigs,
-    saveConfigs,
-    resetConfigs
-  };
+  return { configs, loading, error, loadConfigs, saveConfigs, resetConfigs };
 };
 
 export default logoConfigService;

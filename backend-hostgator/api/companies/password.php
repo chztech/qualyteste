@@ -1,52 +1,83 @@
 <?php
 require_once '../config/cors.php';
-require_once '../config/database.php';
+require_once '../helpers/functions.php';
 
-// Apenas PUT
-if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
-    http_response_code(405);
-    echo json_encode(["success" => false, "error" => "Method not allowed"]);
+$method = $_SERVER['REQUEST_METHOD'];
+
+// Preflight CORS
+if ($method === 'OPTIONS') {
+    http_response_code(200);
     exit();
 }
 
-// Verificar autenticação
-$headers = getallheaders();
-$authHeader = $headers['Authorization'] ?? '';
-if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-    http_response_code(401);
-    echo json_encode(["success" => false, "error" => "Token required"]);
-    exit();
+// Aceita PUT (e POST opcionalmente)
+if (!in_array($method, ['PUT', 'POST'], true)) {
+    jsonResponse(false, null, 405, 'Method not allowed');
 }
 
-require_once '../auth/verify_jwt.php';
-$user = verifyJWT($matches[1]);
-if (!$user || $user['role'] !== 'admin') {
-    http_response_code(403);
-    echo json_encode(["success" => false, "error" => "Permission denied"]);
-    exit();
+$auth = requireAuth();
+// Se quiser travar para admins apenas, descomente:
+// if (!isset($auth['role']) || $auth['role'] !== 'admin') {
+//     jsonResponse(false, null, 403, 'Forbidden');
+// }
+
+$database = new Database();
+$db = $database->getConnection();
+
+$raw = file_get_contents('php://input');
+$payload = json_decode($raw, true);
+if (!is_array($payload)) {
+    $payload = $_POST;
 }
 
-$data = json_decode(file_get_contents("php://input"));
-if (!isset($data->companyId) || !isset($data->password)) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "error" => "Company ID and password required"]);
-    exit();
+$companyId = isset($payload['companyId']) ? trim($payload['companyId']) : '';
+$password = isset($payload['password']) ? (string)$payload['password'] : '';
+
+if ($companyId === '' || $password === '') {
+    jsonResponse(false, null, 422, 'Company id and password are required');
 }
 
 try {
-    $database = new Database();
-    $db = $database->getConnection();
+    // Confere se a empresa existe e pega o e-mail cadastrado
+    $cStmt = $db->prepare('SELECT id, name, email, phone FROM companies WHERE id = ? LIMIT 1');
+    $cStmt->execute([$companyId]);
+    $company = $cStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$company) {
+        jsonResponse(false, null, 404, 'Company not found');
+    }
 
-    // Atualizar senha do usuário vinculado à empresa
-    $passwordHash = password_hash($data->password, PASSWORD_BCRYPT);
+    $passwordHash = password_hash($password, PASSWORD_BCRYPT);
 
-    $query = "UPDATE users SET password_hash = ? WHERE company_id = ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$passwordHash, $data->companyId]);
+    // 1) Tenta atualizar pelo company_id
+    $uStmt = $db->prepare('UPDATE users SET password_hash = ?, updated_at = NOW()
+                           WHERE role = "company" AND company_id = ?');
+    $uStmt->execute([$passwordHash, $companyId]);
 
-    echo json_encode(["success" => true, "message" => "Senha alterada com sucesso"]);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(["success" => false, "error" => "Internal server error"]);
+    // 2) Se não atualizou ninguém, tenta pelo e-mail da empresa
+    if ($uStmt->rowCount() === 0 && !empty($company['email'])) {
+        $uStmt2 = $db->prepare('UPDATE users SET password_hash = ?, updated_at = NOW()
+                                WHERE role = "company" AND email = ?');
+        $uStmt2->execute([$passwordHash, $company['email']]);
+
+        // 3) Se ainda não existe usuário da empresa, cria um agora
+        if ($uStmt2->rowCount() === 0) {
+            $userId = newId();
+            $ins = $db->prepare('INSERT INTO users
+                (id, name, email, phone, role, company_id, password_hash, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, "company", ?, ?, 1, NOW(), NOW())');
+
+            $ins->execute([
+                $userId,
+                $company['name'] ?: 'Empresa',
+                $company['email'],
+                $company['phone'],
+                $companyId,
+                $passwordHash
+            ]);
+        }
+    }
+
+    jsonResponse(true, ['companyId' => $companyId, 'message' => 'Password updated']);
+} catch (PDOException $e) {
+    jsonResponse(false, null, 500, 'Database error: ' . $e->getMessage());
 }
-?>

@@ -1,0 +1,16 @@
+[29-Sep-2025 16:09:08 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function requireAuth() in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php:9
+Stack trace:
+#0 {main}
+  thrown in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php on line 9
+[29-Sep-2025 16:09:30 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function requireAuth() in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php:9
+Stack trace:
+#0 {main}
+  thrown in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php on line 9
+[29-Sep-2025 16:13:31 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function requireAuth() in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php:9
+Stack trace:
+#0 {main}
+  thrown in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php on line 9
+[29-Sep-2025 16:16:24 America/Fortaleza] PHP Fatal error:  Uncaught Error: Call to undefined function requireAuth() in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php:9
+Stack trace:
+#0 {main}
+  thrown in /home2/chztec51/qualycorpore.chztech.com.br/api/providers/index.php on line 9

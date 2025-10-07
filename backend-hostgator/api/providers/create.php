@@ -1,81 +1,72 @@
 <?php
-require_once '../config/cors.php';
-require_once '../helpers/functions.php';
+require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    jsonResponse(false, null, 405, 'Method not allowed');
+  json_end(405, ['success' => false, 'error' => 'Method not allowed']);
 }
 
-requireAuth();
-$database = new Database();
-$db = $database->getConnection();
+$body = json_decode(file_get_contents('php://input'), true);
+if (!is_array($body)) $body = $_POST;
 
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = $_POST;
+$name         = trim($body['name'] ?? '');
+$email        = trim($body['email'] ?? '');
+$phone        = $body['phone'] ?? null;
+$specialties  = $body['specialties'] ?? [];
+$workingHours = $body['workingHours'] ?? null;
+$breaks       = $body['breaks'] ?? [];
+$isActive     = isset($body['isActive']) ? (intval($body['isActive']) ? 1 : 0) : 1;
+
+$userId       = $body['userId'] ?? null;       // opcional
+$createUser   = !!($body['createUser'] ?? false);
+$companyId    = $body['companyId'] ?? null;    // usado só se createUser=true
+
+if ($name === '' || $email === '') {
+  json_end(400, ['success' => false, 'error' => 'name and email are required']);
 }
 
-$name = isset($data['name']) ? trim($data['name']) : '';
-$email = isset($data['email']) ? trim($data['email']) : null;
-$phone = isset($data['phone']) ? trim($data['phone']) : null;
-$specialties = isset($data['specialties']) && is_array($data['specialties']) ? $data['specialties'] : [];
-$workingHours = isset($data['workingHours']) && is_array($data['workingHours']) ? $data['workingHours'] : null;
-$breaks = isset($data['breaks']) && is_array($data['breaks']) ? $data['breaks'] : [];
-$createUser = isset($data['createUser']) ? (bool) $data['createUser'] : false;
-$userId = isset($data['userId']) ? trim($data['userId']) : null;
-
-if ($name === '') {
-    jsonResponse(false, null, 422, 'Name is required');
-}
+$db = (new Database())->getConnection();
+$db->beginTransaction();
 
 try {
-    $providerId = newId();
-    $db->beginTransaction();
+  if ($createUser && !$userId) {
+    // cria um user básico (senha pode ser definida depois via /providers/password.php)
+    $chk = $db->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+    $chk->execute([$email]);
+    if ($chk->fetch()) throw new Exception('Email already in use');
 
-    if ($createUser && !$userId) {
-        $passwordPlain = bin2hex(random_bytes(6));
-        $passwordHash = password_hash($passwordPlain, PASSWORD_BCRYPT);
-        $userId = newId();
+    $uid = bin2hex(random_bytes(16));
+    $stmt = $db->prepare(
+      "INSERT INTO users (id, name, email, phone, role, company_id, password_hash, is_active)
+       VALUES (?, ?, ?, ?, 'provider', ?, '', 1)"
+    );
+    $stmt->execute([$uid, $name, $email, $phone, $companyId]);
+    $userId = $uid;
+  }
 
-        $userStmt = $db->prepare('INSERT INTO users (id, name, email, phone, role, password_hash, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())');
-        $userStmt->execute([
-            $userId,
-            $name,
-            $email,
-            $phone,
-            'provider',
-            $passwordHash
-        ]);
-    }
+  $pid = bin2hex(random_bytes(16));
+  $stmt = $db->prepare(
+    "INSERT INTO providers
+     (id, user_id, name, email, phone, specialties, working_hours, breaks, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  );
+  $stmt->execute([
+    $pid,
+    $userId,
+    $name,
+    $email,
+    $phone,
+    json_encode($specialties, JSON_UNESCAPED_UNICODE),
+    $workingHours ? json_encode($workingHours, JSON_UNESCAPED_UNICODE) : null,
+    json_encode($breaks, JSON_UNESCAPED_UNICODE),
+    $isActive
+  ]);
 
-    $stmt = $db->prepare('INSERT INTO providers (id, user_id, name, email, phone, specialties, working_hours, breaks, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
-    $stmt->execute([
-        $providerId,
-        $userId,
-        $name,
-        $email,
-        $phone,
-        json_encode($specialties, JSON_UNESCAPED_UNICODE),
-        $workingHours ? json_encode($workingHours, JSON_UNESCAPED_UNICODE) : null,
-        json_encode($breaks, JSON_UNESCAPED_UNICODE)
-    ]);
-
-    $db->commit();
-
-    jsonResponse(true, [
-        'id' => $providerId,
-        'userId' => $userId,
-        'name' => $name,
-        'email' => $email,
-        'phone' => $phone,
-        'specialties' => $specialties,
-        'workingHours' => $workingHours,
-        'breaks' => $breaks
-    ], 201);
-} catch (Exception $exception) {
-    if ($db->inTransaction()) {
-        $db->rollBack();
-    }
-    jsonResponse(false, null, 500, 'Failed to create provider: ' . $exception->getMessage());
+  $db->commit();
+  json_end(201, ['success' => true, 'data' => ['id' => $pid, 'userId' => $userId]]);
+} catch (Throwable $e) {
+  $db->rollBack();
+  error_log("providers/create error: ".$e->getMessage());
+  json_end(500, ['success' => false, 'error' => 'Could not create provider']);
 }

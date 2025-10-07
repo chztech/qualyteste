@@ -1,0 +1,56 @@
+# --- CORS (sempre) ---
+
+<IfModule mod_headers.c>
+    # Se quiser liberar mais de uma origem:
+    # SetEnvIf Origin "^(https://corpore\.netlify\.app|http://localhost:5173)$" ORIGIN=$0
+    # Header always set Access-Control-Allow-Origin %{ORIGIN}e env=ORIGIN
+    # Se for só produção:
+    Header always set Access-Control-Allow-Origin "https://corpore.netlify.app"
+
+    Header always set Vary "Origin"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    Header always set Access-Control-Allow-Credentials "true"
+    # Cache do preflight (opcional)
+    Header always set Access-Control-Max-Age "600"
+
+</IfModule>
+
+# --- Trate o preflight ANTES de qualquer rewrite ---
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Responde OPTIONS (preflight) com 204 e sem redirecionar para PHP
+    RewriteCond %{REQUEST_METHOD} =OPTIONS
+    RewriteRule ^ - [R=204,L]
+
+    # Permite chamar /auth/login sem .php
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.php -f
+    RewriteRule ^(.*)$ $1.php [L]
+
+    # Se não for arquivo nem pasta, roteia para index.php (API REST "catch-all")
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+
+</IfModule>
+
+# --- Bloquear acesso direto à pasta config ---
+
+RewriteRule ^config/ - [F,L]
+
+# --- Headers de segurança (ok manter) ---
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# --- Evitar cache (opcional) ---
+
+<IfModule mod_expires.c>
+    ExpiresActive Off
+</IfModule>

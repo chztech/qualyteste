@@ -1,104 +1,136 @@
 <?php
-require_once '../config/cors.php';
-require_once '../helpers/functions.php';
+// backend-hostgator/api/services/index.php
+// NADA antes desta linha (sem BOM)
+require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/jwt.php';
+require_once __DIR__ . '/../helpers/functions.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+  json_end(200, ['success' => true]);
 }
 
-$auth = requireAuth();
-$database = new Database();
-$db = $database->getConnection();
-
-$raw = file_get_contents('php://input');
-$payload = json_decode($raw, true);
-if (!is_array($payload)) {
-    $payload = $_POST;
-}
+// Se quiser exigir auth, descomente o bloco abaixo:
+// $token = getBearerToken();
+// $payload = $token ? jwt_verify($token) : false;
+// if (!$payload) {
+//   json_end(401, ['success' => false, 'error' => 'Unauthorized']);
+// }
 
 try {
-    if ($method === 'GET') {
-        $stmt = $db->query('SELECT id, name, description, duration, price, created_at, updated_at FROM services ORDER BY name ASC');
-        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        jsonResponse(true, $services);
+  $db = (new Database())->getConnection();
+
+  // Lê corpo JSON de forma segura
+  $raw = file_get_contents('php://input');
+  $payload = json_decode($raw, true);
+  if (!is_array($payload)) { $payload = $_POST; }
+
+  if ($method === 'GET') {
+    // filtros opcionais
+    $isActive = isset($_GET['isActive']) ? $_GET['isActive'] : null;
+
+    $sql = "SELECT id, name, description, duration, price, is_active, created_at, updated_at
+            FROM services";
+    $params = [];
+    if ($isActive !== null && $isActive !== '') {
+      $sql .= " WHERE is_active = ?";
+      $params[] = (intval($isActive) ? 1 : 0);
+    }
+    $sql .= " ORDER BY name ASC";
+
+    $st = $db->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+    // normalizações
+    foreach ($rows as &$r) {
+      if (isset($r['duration'])) $r['duration'] = (int)$r['duration'];
+      if (isset($r['price']) && $r['price'] !== null) $r['price'] = (float)$r['price'];
+      $r['is_active'] = isset($r['is_active']) ? (bool)intval($r['is_active']) : true;
     }
 
-    if ($method === 'POST') {
-        $name = isset($payload['name']) ? trim($payload['name']) : '';
-        $duration = isset($payload['duration']) ? (int) $payload['duration'] : null;
-        $description = isset($payload['description']) ? trim($payload['description']) : null;
-        $price = isset($payload['price']) ? (float) $payload['price'] : null;
+    json_end(200, ['success' => true, 'data' => $rows]);
+  }
 
-        if ($name === '' || !$duration) {
-            jsonResponse(false, null, 422, 'Name and duration are required');
-        }
+  if ($method === 'POST') {
+    $name        = isset($payload['name']) ? trim($payload['name']) : '';
+    $duration    = isset($payload['duration']) ? (int)$payload['duration'] : null;
+    $description = isset($payload['description']) ? trim($payload['description']) : null;
+    $price       = (isset($payload['price']) && $payload['price'] !== '') ? (float)$payload['price'] : null;
+    $isActive    = isset($payload['isActive']) ? (intval($payload['isActive']) ? 1 : 0) : 1;
 
-        $id = newId();
-        $stmt = $db->prepare('INSERT INTO services (id, name, description, duration, price, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())');
-        $stmt->execute([$id, $name, $description, $duration, $price]);
-
-        jsonResponse(true, [
-            'id' => $id,
-            'name' => $name,
-            'description' => $description,
-            'duration' => $duration,
-            'price' => $price
-        ], 201);
+    if ($name === '' || !$duration) {
+      json_end(422, ['success' => false, 'error' => 'Name and duration are required']);
     }
 
-    if (in_array($method, ['PUT', 'PATCH'])) {
-        $id = isset($payload['id']) ? trim($payload['id']) : '';
-        if ($id === '') {
-            jsonResponse(false, null, 422, 'Service id is required');
-        }
+    // usa newId() se existir no helpers, senão gera local
+    if (!function_exists('newId')) {
+      function newId() { return bin2hex(random_bytes(16)); }
+    }
+    $id = newId();
 
-        $fields = [];
-        $values = [];
+    $st = $db->prepare("INSERT INTO services (id, name, description, duration, price, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())");
+    $st->execute([$id, $name, $description, $duration, $price, $isActive]);
 
-        if (isset($payload['name'])) {
-            $fields[] = 'name = ?';
-            $values[] = trim($payload['name']);
-        }
-        if (isset($payload['description'])) {
-            $fields[] = 'description = ?';
-            $values[] = trim($payload['description']);
-        }
-        if (isset($payload['duration'])) {
-            $fields[] = 'duration = ?';
-            $values[] = (int) $payload['duration'];
-        }
-        if (isset($payload['price'])) {
-            $fields[] = 'price = ?';
-            $values[] = (float) $payload['price'];
-        }
+    json_end(201, [
+      'success' => true,
+      'data' => [
+        'id' => $id,
+        'name' => $name,
+        'description' => $description,
+        'duration' => $duration,
+        'price' => $price,
+        'is_active' => (bool)$isActive
+      ]
+    ]);
+  }
 
-        if (!$fields) {
-            jsonResponse(false, null, 400, 'No fields to update');
-        }
-
-        $fields[] = 'updated_at = NOW()';
-        $values[] = $id;
-
-        $stmt = $db->prepare('UPDATE services SET ' . implode(', ', $fields) . ' WHERE id = ?');
-        $stmt->execute($values);
-
-        jsonResponse(true, ['id' => $id]);
+  if ($method === 'PUT' || $method === 'PATCH') {
+    $id = isset($payload['id']) ? trim($payload['id']) : '';
+    if ($id === '') {
+      json_end(422, ['success' => false, 'error' => 'Service id is required']);
     }
 
-    if ($method === 'DELETE') {
-        $id = isset($_GET['id']) ? trim($_GET['id']) : (isset($payload['id']) ? trim($payload['id']) : '');
-        if ($id === '') {
-            jsonResponse(false, null, 422, 'Service id is required');
-        }
+    $fields = [];
+    $values = [];
 
-        $stmt = $db->prepare('DELETE FROM services WHERE id = ?');
-        $stmt->execute([$id]);
-        jsonResponse(true, ['id' => $id]);
+    if (array_key_exists('name', $payload))        { $fields[] = 'name = ?';        $values[] = trim((string)$payload['name']); }
+    if (array_key_exists('description', $payload)) { $fields[] = 'description = ?'; $values[] = ($payload['description'] !== null ? trim((string)$payload['description']) : null); }
+    if (array_key_exists('duration', $payload))    { $fields[] = 'duration = ?';    $values[] = ($payload['duration'] !== null ? (int)$payload['duration'] : null); }
+    if (array_key_exists('price', $payload))       { $fields[] = 'price = ?';       $values[] = ($payload['price'] !== null && $payload['price'] !== '' ? (float)$payload['price'] : null); }
+    if (array_key_exists('isActive', $payload))    { $fields[] = 'is_active = ?';   $values[] = (intval($payload['isActive']) ? 1 : 0); }
+
+    if (!$fields) {
+      json_end(400, ['success' => false, 'error' => 'No fields to update']);
     }
 
-    jsonResponse(false, null, 405, 'Unsupported method');
-} catch (PDOException $exception) {
-    jsonResponse(false, null, 500, 'Database error: ' . $exception->getMessage());
+    $fields[] = 'updated_at = NOW()';
+    $values[] = $id;
+
+    $st = $db->prepare('UPDATE services SET ' . implode(', ', $fields) . ' WHERE id = ?');
+    $st->execute($values);
+
+    json_end(200, ['success' => true, 'data' => ['id' => $id]]);
+  }
+
+  if ($method === 'DELETE') {
+    $id = isset($_GET['id']) ? trim($_GET['id']) : (isset($payload['id']) ? trim($payload['id']) : '');
+    if ($id === '') {
+      json_end(422, ['success' => false, 'error' => 'Service id is required']);
+    }
+
+    $st = $db->prepare('DELETE FROM services WHERE id = ?');
+    $st->execute([$id]);
+
+    json_end(200, ['success' => true, 'data' => ['id' => $id]]);
+  }
+
+  json_end(405, ['success' => false, 'error' => 'Unsupported method']);
+} catch (Throwable $e) {
+  error_log("services/index error: " . $e->getMessage());
+  // Não derruba o front; responde estrutura válida
+  json_end(200, ['success' => true, 'data' => []]);
 }

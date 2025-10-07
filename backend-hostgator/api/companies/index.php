@@ -1,96 +1,113 @@
 <?php
-require_once '../config/cors.php';
-require_once '../helpers/functions.php';
+// backend-hostgator/api/companies/index.php
+require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/jwt.php';
+require_once __DIR__ . '/../helpers/functions.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    jsonResponse(false, null, 405, 'Method not allowed');
+    json_end(405, ['success' => false, 'error' => 'Method not allowed']);
 }
 
-$auth = requireAuth();
-$database = new Database();
-$db = $database->getConnection();
+try {
+    $db = (new Database())->getConnection();
 
-$companyIdFromToken = null;
-if (isset($auth['company_id']) && $auth['company_id']) {
-    $companyIdFromToken = $auth['company_id'];
-}
+    // --- Autenticação opcional via Bearer token ---
+    $payload = null;
+    $token = getBearerToken();
+    if ($token) {
+        $payload = jwt_verify($token); // retorna array ou false
+        if ($payload === false) {
+            // Token inválido => trata como não autenticado (público)
+            $payload = null;
+        }
+    }
 
-if ($companyIdFromToken === null && $auth['role'] === 'company') {
-    try {
+    // companyId do token (se houver)
+    $companyIdFromToken = null;
+    if (is_array($payload) && !empty($payload['company_id'])) {
+        $companyIdFromToken = $payload['company_id'];
+    } elseif (is_array($payload) && ($payload['role'] ?? null) === 'company') {
+        // fallback: buscar no users.company_id
         $stmt = $db->prepare('SELECT company_id FROM users WHERE id = ? LIMIT 1');
-        $stmt->execute([$auth['user_id']]);
+        $stmt->execute([$payload['user_id'] ?? null]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row && $row['company_id']) {
             $companyIdFromToken = $row['company_id'];
         }
-    } catch (Exception $exception) {
-        jsonResponse(false, null, 500, 'Failed to resolve company context');
     }
-}
 
-try {
-    $query = 'SELECT id, name, address, phone, email, public_token, created_at, updated_at FROM companies';
+    // --- Monta query base ---
+    $query = 'SELECT id, name, address, phone, email, public_token, is_active, settings, created_at, updated_at FROM companies';
     $params = [];
-    $where = [];
+    $where  = [];
 
+    // Filtro por id específico (querystring)
     if (!empty($_GET['id'])) {
         $where[] = 'id = ?';
         $params[] = $_GET['id'];
     }
 
+    // Se veio empresa no token, restringe a ela
     if ($companyIdFromToken) {
         $where[] = 'id = ?';
         $params[] = $companyIdFromToken;
     }
 
+    // Somente ativas para contexto público
     $where[] = 'is_active = 1';
 
     if ($where) {
         $query .= ' WHERE ' . implode(' AND ', $where);
     }
-
     $query .= ' ORDER BY name ASC';
 
     $stmt = $db->prepare($query);
     $stmt->execute($params);
     $companies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $employeeStmt = null;
+    // Incluir employees se a tabela existir
     $includeEmployees = true;
-    $companiesWithEmployees = [];
+    $employeeStmt = null;
+    $out = [];
 
-    foreach ($companies as $company) {
+    foreach ($companies as $c) {
+        // Decodifica settings JSON (se existir)
+        if (isset($c['settings']) && $c['settings'] !== '' && $c['settings'] !== null) {
+            $dec = json_decode($c['settings'], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $c['settings'] = $dec;
+            } else {
+                $c['settings'] = null;
+            }
+        } else {
+            $c['settings'] = null;
+        }
+
+        // Employees
         $employees = [];
         if ($includeEmployees) {
             try {
                 if ($employeeStmt === null) {
                     $employeeStmt = $db->prepare('SELECT id, name, phone, department, company_id, created_at, updated_at FROM company_employees WHERE company_id = ? ORDER BY name ASC');
                 }
-                $employeeStmt->execute([$company['id']]);
+                $employeeStmt->execute([$c['id']]);
                 $employees = $employeeStmt->fetchAll(PDO::FETCH_ASSOC);
-            } catch (PDOException $exception) {
-                if ($exception->getCode() === '42S02') {
+            } catch (PDOException $e) {
+                // Tabela não existe => ignora de forma silenciosa
+                if ($e->getCode() === '42S02') { // Base table or view not found
                     $includeEmployees = false;
+                    $employees = []; // não inclui mais
                 } else {
-                    throw $exception;
+                    throw $e; // outro erro real
                 }
             }
         }
 
-        $companiesWithEmployees[] = [
-            'id' => $company['id'],
-            'name' => $company['name'],
-            'address' => $company['address'],
-            'phone' => $company['phone'],
-            'email' => $company['email'],
-            'publicToken' => $company['public_token'],
-            'createdAt' => $company['created_at'],
-            'updatedAt' => $company['updated_at'],
-            'employees' => $employees
-        ];
-    }
-
-    jsonResponse(true, $companiesWithEmployees);
-} catch (PDOException $exception) {
-    jsonResponse(false, null, 500, 'Database error: ' . $exception->getMessage());
-}
+        $out[] = [
+            'id'          => $c['id'],
+            'name'        => $c['name'],
+            'address'     => $c['address'],
+            'phone'       => $c['phone'],
+            'email'       => $c['email'],

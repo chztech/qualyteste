@@ -3,13 +3,13 @@ class Database {
     private $host = "localhost";
     private $db_name; // Substitua pelo nome real do seu banco
     private $username; // Substitua pelo usuário real
-    private $password; // Substitua pela senha real
+    private $password;  // Substitua pela senha real
     public $conn;
 
     public function __construct() {
         $this->db_name = getenv('DB_NAME') ?: 'chztec51_qualycorpore';
-        $this->username = getenv('DB_USER') ?: 'root';
-        $this->password = getenv('DB_PASS') ?: '';
+        $this->username = getenv('DB_USER') ?: 'chztec51_qualycorpore';
+        $this->password = getenv('DB_PASS') ?: ',[n1cOul?Ijf';
     }
 
 

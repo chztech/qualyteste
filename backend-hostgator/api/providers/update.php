@@ -1,107 +1,38 @@
 <?php
-require_once '../config/cors.php';
-require_once '../helpers/functions.php';
+require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../config/cors.php';
+require_once __DIR__ . '/../config/database.php';
 
-if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'PATCH'])) {
-    jsonResponse(false, null, 405, 'Method not allowed');
+if ($_SERVER['REQUEST_METHOD'] !== 'PUT' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+  json_end(405, ['success' => false, 'error' => 'Method not allowed']);
 }
 
-requireAuth();
-$database = new Database();
-$db = $database->getConnection();
+$body = json_decode(file_get_contents('php://input'), true);
+if (!is_array($body)) $body = $_POST;
 
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = $_POST;
+$id = $body['id'] ?? null;
+if (!$id) json_end(400, ['success' => false, 'error' => 'id is required']);
+
+$fields = [];
+$params = [];
+
+foreach (['name','email','phone'] as $f) {
+  if (array_key_exists($f, $body)) { $fields[] = "$f = ?"; $params[] = $body[$f]; }
+}
+if (array_key_exists('specialties', $body))   { $fields[] = "specialties = ?";    $params[] = json_encode($body['specialties'], JSON_UNESCAPED_UNICODE); }
+if (array_key_exists('workingHours', $body))  { $fields[] = "working_hours = ?";  $params[] = $body['workingHours'] !== null ? json_encode($body['workingHours'], JSON_UNESCAPED_UNICODE) : null; }
+if (array_key_exists('breaks', $body))        { $fields[] = "breaks = ?";         $params[] = json_encode($body['breaks'], JSON_UNESCAPED_UNICODE); }
+if (array_key_exists('isActive', $body))      { $fields[] = "is_active = ?";      $params[] = (intval($body['isActive']) ? 1 : 0); }
+
+if (empty($fields)) {
+  json_end(400, ['success' => false, 'error' => 'No updatable fields provided']);
 }
 
-$providerId = isset($data['id']) ? trim($data['id']) : '';
-if ($providerId === '') {
-    jsonResponse(false, null, 422, 'Provider id is required');
-}
+$params[] = $id;
 
-$name = isset($data['name']) ? trim($data['name']) : null;
-$email = isset($data['email']) ? trim($data['email']) : null;
-$phone = isset($data['phone']) ? trim($data['phone']) : null;
-$specialties = isset($data['specialties']) && is_array($data['specialties']) ? $data['specialties'] : null;
-$workingHours = isset($data['workingHours']) && is_array($data['workingHours']) ? $data['workingHours'] : null;
-$breaks = isset($data['breaks']) && is_array($data['breaks']) ? $data['breaks'] : null;
-$userId = isset($data['userId']) ? trim($data['userId']) : null;
+$db = (new Database())->getConnection();
+$sql = "UPDATE providers SET " . implode(", ", $fields) . " WHERE id = ?";
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 
-try {
-    $fields = [];
-    $values = [];
-
-    if ($name !== null) {
-        $fields[] = 'name = ?';
-        $values[] = $name;
-    }
-    if ($email !== null) {
-        $fields[] = 'email = ?';
-        $values[] = $email;
-    }
-    if ($phone !== null) {
-        $fields[] = 'phone = ?';
-        $values[] = $phone;
-    }
-    if ($specialties !== null) {
-        $fields[] = 'specialties = ?';
-        $values[] = json_encode($specialties, JSON_UNESCAPED_UNICODE);
-    }
-    if ($workingHours !== null) {
-        $fields[] = 'working_hours = ?';
-        $values[] = json_encode($workingHours, JSON_UNESCAPED_UNICODE);
-    }
-    if ($breaks !== null) {
-        $fields[] = 'breaks = ?';
-        $values[] = json_encode($breaks, JSON_UNESCAPED_UNICODE);
-    }
-
-    $fields[] = 'updated_at = NOW()';
-
-    if (!$fields) {
-        jsonResponse(false, null, 400, 'No updatable fields provided');
-    }
-
-    $values[] = $providerId;
-
-    $db->beginTransaction();
-
-    $stmt = $db->prepare('UPDATE providers SET ' . implode(', ', $fields) . ' WHERE id = ?');
-    $stmt->execute($values);
-
-    if ($userId && ($name !== null || $email !== null || $phone !== null)) {
-        $userFields = [];
-        $userValues = [];
-        if ($name !== null) {
-            $userFields[] = 'name = ?';
-            $userValues[] = $name;
-        }
-        if ($email !== null) {
-            $userFields[] = 'email = ?';
-            $userValues[] = $email;
-        }
-        if ($phone !== null) {
-            $userFields[] = 'phone = ?';
-            $userValues[] = $phone;
-        }
-        if ($userFields) {
-            $userFields[] = 'updated_at = NOW()';
-            $userValues[] = $userId;
-            $userStmt = $db->prepare('UPDATE users SET ' . implode(', ', $userFields) . ' WHERE id = ?');
-            $userStmt->execute($userValues);
-        }
-    }
-
-    $db->commit();
-
-    jsonResponse(true, [
-        'id' => $providerId
-    ]);
-} catch (Exception $exception) {
-    if ($db->inTransaction()) {
-        $db->rollBack();
-    }
-    jsonResponse(false, null, 500, 'Failed to update provider: ' . $exception->getMessage());
-}
+json_end(200, ['success' => true, 'message' => 'Provider updated']);

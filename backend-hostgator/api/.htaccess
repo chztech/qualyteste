@@ -20,7 +20,7 @@ Header always set X-XSS-Protection "1; mode=block"
 
 # Configuração de CORS
 <IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "https://corpore.netlify.app"
+    Header always set Access-Control-Allow-Origin "https://qualycorpore.netlify.app"
     Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
     Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
     Header always set Access-Control-Allow-Credentials "true"
