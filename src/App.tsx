@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Header from "./components/Layout/Header";
 import Sidebar from "./components/Layout/Sidebar";
 import CalendarHeader from "./components/Calendar/CalendarHeader";
@@ -31,17 +31,17 @@ import {
 import { Building2 } from "lucide-react";
 
 function App() {
-  // Authentication state
+  // Auth
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Application state
+  // UI / view
   const [activeTab, setActiveTab] = useState("calendar");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
 
-  // Data state
+  // Data
   const [users, setUsers] = useState<User[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -50,7 +50,10 @@ function App() {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
-  const generateId = React.useCallback(
+  // Página pública (sem login)
+  const [publicReady, setPublicReady] = useState(false);
+
+  const generateId = useCallback(
     () =>
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
@@ -58,7 +61,7 @@ function App() {
     []
   );
 
-  const loadInitialData = React.useCallback(
+  const loadInitialData = useCallback(
     async (roleOverride?: User["role"]) => {
       setIsBootstrapping(true);
       setDataError(null);
@@ -81,25 +84,13 @@ function App() {
             : Promise.resolve({ success: true, data: [] }),
         ]);
 
-        setCompanies(
-          companiesRes.success && companiesRes.data ? companiesRes.data : []
-        );
-        setProviders(
-          providersRes.success && providersRes.data ? providersRes.data : []
-        );
-        setServices(
-          servicesRes.success && servicesRes.data ? servicesRes.data : []
-        );
-        setAppointments(
-          appointmentsRes.success && appointmentsRes.data
-            ? appointmentsRes.data
-            : []
-        );
+        setCompanies(companiesRes.success && companiesRes.data ? companiesRes.data : []);
+        setProviders(providersRes.success && providersRes.data ? providersRes.data : []);
+        setServices(servicesRes.success && servicesRes.data ? servicesRes.data : []);
+        setAppointments(appointmentsRes.success && appointmentsRes.data ? appointmentsRes.data : []);
 
         if (effectiveRole === "admin") {
-          setUsers(
-            usersRes.success && usersRes.data ? (usersRes.data as User[]) : []
-          );
+          setUsers(usersRes.success && usersRes.data ? (usersRes.data as User[]) : []);
         } else {
           setUsers([]);
         }
@@ -113,7 +104,7 @@ function App() {
     [currentUser?.role]
   );
 
-  // Simplified time slots
+  // slots de 15 em 15min 06:00–23:45 + 00:00
   const [availableTimeSlots] = useState(() => {
     const slots: string[] = [];
     for (let hour = 6; hour < 24; hour++) {
@@ -128,7 +119,7 @@ function App() {
     return slots;
   });
 
-  // Form state
+  // Modais/forms
   const [isAppointmentFormOpen, setIsAppointmentFormOpen] = useState(false);
   const [isAdminSchedulingOpen, setIsAdminSchedulingOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] =
@@ -136,35 +127,37 @@ function App() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  // Utils
   const calculateEndTime = (startTime: string, duration: number) => {
     const [hours, minutes] = startTime.split(":").map(Number);
     const startMinutes = hours * 60 + minutes;
     const endMinutes = startMinutes + duration;
     const endHours = Math.floor(endMinutes / 60);
     const remainingMinutes = endMinutes % 60;
+
     return `${endHours.toString().padStart(2, "0")}:${remainingMinutes
       .toString()
       .padStart(2, "0")}`;
   };
 
-  // Public booking helpers
+  // ————— PÁGINA PÚBLICA —————
   const isPublicBookingPage = () => {
     try {
       const path = window.location.pathname;
       const isBookingRoute =
         path.startsWith("/agendamento/") &&
         path.length > "/agendamento/".length;
-      if (isBookingRoute) {
-        const token = path.split("/agendamento/")[1];
-        try {
-          const decoded = atob(token);
-          return decoded && decoded.length > 0 && !decoded.includes(" ");
-        } catch {
-          return false;
-        }
+      if (!isBookingRoute) return false;
+
+      const token = path.split("/agendamento/")[1];
+      try {
+        const decoded = atob(token);
+        return decoded && decoded.length > 0 && !decoded.includes(" ");
+      } catch {
+        return false;
       }
-      return false;
-    } catch {
+    } catch (error) {
+      console.error("Erro ao verificar página pública:", error);
       return false;
     }
   };
@@ -172,22 +165,80 @@ function App() {
   const getBookingToken = () => {
     try {
       const path = window.location.pathname;
-      return path.split("/agendamento/")[1] || null;
-    } catch {
+      const token = path.split("/agendamento/")[1];
+      return token;
+    } catch (error) {
+      console.error("Erro ao extrair token:", error);
       return null;
     }
   };
 
-  // 🔄 Carrega dados automaticamente quando for rota pública
+  // Carrega dados públicos quando na rota pública (sem exigir login)
   useEffect(() => {
-    if (isPublicBookingPage()) {
-      loadInitialData();
-    }
-  }, [loadInitialData]);
+    if (!isPublicBookingPage()) return;
 
-  // Employees (company)
+    const token = getBookingToken();
+    if (!token) return;
+
+    let companyId: string | null = null;
+    try {
+      companyId = atob(token);
+    } catch {
+      companyId = null;
+    }
+    if (!companyId) return;
+
+    (async () => {
+      try {
+        // Empresa + colaboradores
+        const cRes = await apiService.getPublicCompany(companyId!);
+        if (cRes.success && cRes.data) {
+          setCompanies([cRes.data as unknown as Company]);
+        } else {
+          setCompanies([]);
+        }
+
+        // Slots públicos da empresa (sem employeeId, futuro)
+        const aRes = await apiService.getPublicAppointments(companyId!);
+        if (aRes.success && aRes.data) {
+          const mapped = (aRes.data as any[]).map((r) => ({
+            id: r.id,
+            date: r.date,
+            startTime: r.start_time,
+            endTime: r.end_time,
+            duration: Number(r.duration || 0),
+            status: r.status,
+            companyId: r.company_id,
+            providerId: r.provider_id,
+            clientId: r.client_id ?? null,
+            employeeId: r.employee_id ?? null,
+            serviceId: r.service_id ?? null,
+            notes: r.notes ?? null,
+            // nomes vindos do endpoint público
+            serviceName: r.service_name ?? null,
+            providerName: r.provider_name ?? null,
+            companyName: null,
+            employeeName: null,
+            createdAt: null,
+            updatedAt: null,
+          }));
+          setAppointments(mapped);
+        } else {
+          setAppointments([]);
+        }
+      } catch (e) {
+        console.error("Public boot error:", e);
+        setAppointments([]);
+        setCompanies([]);
+      } finally {
+        setPublicReady(true);
+      }
+    })();
+  }, []);
+
+  // Employees (empresa)
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find((c) => c.id === employeeData.companyId);
+    const company = companies.find((item) => item.id === employeeData.companyId);
     if (!company) return;
 
     const newEmployee: Employee = { ...employeeData, id: generateId() };
@@ -207,17 +258,17 @@ function App() {
     id: string,
     employeeData: Partial<Employee>
   ) => {
-    const company = companies.find((c) => c.employees.some((e) => e.id === id));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
     if (!company) return;
 
-    const updatedEmployees = company.employees.map((e) =>
-      e.id === id ? { ...e, ...employeeData } : e
+    const updatedEmployees = company.employees.map((employee) =>
+      employee.id === id ? { ...employee, ...employeeData } : employee
     );
 
     try {
-      await apiService.updateCompany(company.id, {
-        employees: updatedEmployees,
-      });
+      await apiService.updateCompany(company.id, { employees: updatedEmployees });
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar colaborador:", error);
@@ -228,15 +279,17 @@ function App() {
   const handleDeleteEmployee = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este colaborador?")) return;
 
-    const company = companies.find((c) => c.employees.some((e) => e.id === id));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
     if (!company) return;
 
-    const updatedEmployees = company.employees.filter((e) => e.id !== id);
+    const updatedEmployees = company.employees.filter(
+      (employee) => employee.id !== id
+    );
 
     try {
-      await apiService.updateCompany(company.id, {
-        employees: updatedEmployees,
-      });
+      await apiService.updateCompany(company.id, { employees: updatedEmployees });
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir colaborador:", error);
@@ -248,8 +301,10 @@ function App() {
   const handleLogin = async (email: string, password: string) => {
     try {
       const response = await apiService.login(email, password);
+
       if (response.success && response.data) {
         const { user, token } = response.data;
+
         apiService.setAuthToken(token);
         await loadInitialData(user.role);
 
@@ -265,12 +320,17 @@ function App() {
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
 
-        if (mappedUser.role === "company") setActiveTab("dashboard");
-        else if (mappedUser.role === "provider") setActiveTab("my-schedule");
-        else setActiveTab("calendar");
+        if (mappedUser.role === "company") {
+          setActiveTab("dashboard");
+        } else if (mappedUser.role === "provider") {
+          setActiveTab("my-schedule");
+        } else {
+          setActiveTab("calendar");
+        }
 
         return { success: true as const };
       }
+
       const message = response.error || "Falha no login";
       return { success: false as const, message };
     } catch (error) {
@@ -294,32 +354,28 @@ function App() {
     setUsers([]);
   };
 
+  // Calendar handlers
   const handleDateClick = (date: Date) => {
     setSelectedDate(date);
     setCurrentDate(date);
     setViewMode("day");
   };
 
-  const handleCompanyClick = (
-    company: Company,
-    date: string,
-    time?: string
-  ) => {
+  const handleCompanyClick = (company: Company, date: string, time?: string) => {
     const companyAppointments = appointments.filter(
       (apt) =>
         apt.companyId === company.id &&
         apt.date === date &&
         (!time || apt.startTime === time)
     );
+
     if (companyAppointments.length > 0) {
       alert(
-        `🏢 ${company.name}\n📅 ${new Date(date).toLocaleDateString(
-          "pt-BR"
-        )}\n${time ? `🕐 ${time}\n` : ""}\n📊 ${
-          companyAppointments.length
-        } agendamento(s)\n\n${companyAppointments
+        `🏢 ${company.name}\n📅 ${new Date(date).toLocaleDateString("pt-BR")}\n${
+          time ? `🕐 ${time}\n` : ""
+        }\n📊 ${companyAppointments.length} agendamento(s)\n\n${companyAppointments
           .map(
-            (apt) => `• ${apt.startTime} - ${apt.service} (${apt.duration}min)`
+            (apt) => `• ${apt.startTime} - ${apt.serviceName ?? apt.serviceId} (${apt.duration}min)`
           )
           .join("\n")}`
       );
@@ -333,20 +389,12 @@ function App() {
     setIsAppointmentFormOpen(true);
   };
 
-  const handleAppointmentClick = (appointment: Appointment) => {
-    setSelectedAppointment(appointment);
-    setIsAppointmentFormOpen(true);
-  };
-
   const handleAppointmentSubmit = async (
     appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
     try {
       if (selectedAppointment) {
-        await apiService.updateAppointment(
-          selectedAppointment.id,
-          appointmentData
-        );
+        await apiService.updateAppointment(selectedAppointment.id, appointmentData);
       } else {
         await apiService.createAppointment({
           companyId: appointmentData.companyId,
@@ -424,20 +472,19 @@ function App() {
 
   const handleAdminSchedulingSubmit = async (scheduleData: any) => {
     const { companyId, date, slots, chairs } = scheduleData;
+
     try {
       await Promise.all(
         slots.map(async (slot: any) => {
           const endTime = calculateEndTime(slot.time, slot.duration);
-          const providerName = providers.find(
-            (p) => p.id === slot.providerId
-          )?.name;
+          const providerName = providers.find((p) => p.id === slot.providerId)?.name;
           const service = services.find((s) => s.id === slot.serviceId);
 
           await apiService.createAppointment({
             companyId,
             providerId: slot.providerId,
             serviceId: slot.serviceId,
-            clientId: null,
+            clientId: companyId,
             employeeId: null,
             date,
             startTime: slot.time,
@@ -458,6 +505,7 @@ function App() {
     }
   };
 
+  // Empresa marca colaborador em slot existente
   const handleCompanyBookAppointment = async (
     appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -465,7 +513,7 @@ function App() {
       const existingSlot = appointments.find((apt) => {
         const sameService = appointmentData.serviceId
           ? apt.serviceId === appointmentData.serviceId
-          : apt.service === (appointmentData as any).service;
+          : true;
         return (
           apt.companyId === appointmentData.companyId &&
           apt.date === appointmentData.date &&
@@ -496,6 +544,7 @@ function App() {
           notes: appointmentData.notes,
         });
       }
+
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao registrar agendamento da empresa:", error);
@@ -503,6 +552,7 @@ function App() {
     }
   };
 
+  // Público confirma (atualiza slot existente)
   const handlePublicBookAppointment = async (appointmentData: {
     id: string;
     employeeId?: string;
@@ -514,9 +564,11 @@ function App() {
         notes: appointmentData.notes,
         status: "confirmed",
       });
+
       await loadInitialData();
+
       alert(
-        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado."
+        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado. Em caso de dúvidas, entre em contato com a empresa."
       );
     } catch (error) {
       console.error("Erro ao confirmar agendamento público:", error);
@@ -524,8 +576,9 @@ function App() {
     }
   };
 
+  // Adicionar colaborador via público
   const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find((c) => c.id === employeeData.companyId);
+    const company = companies.find((item) => item.id === employeeData.companyId);
     if (!company) {
       alert("Empresa não encontrada para associar o colaborador.");
       return "";
@@ -589,31 +642,13 @@ function App() {
 
   const handleDeleteProvider = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este prestador?")) return;
+
     try {
       await apiService.updateProvider(id, { isActive: false });
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir prestador:", error);
       alert("Não foi possível excluir o prestador. Tente novamente.");
-    }
-  };
-
-  /** alterar senha do prestador */
-  const handleChangeProviderPassword = async (
-    providerId: string,
-    password: string
-  ) => {
-    try {
-      const res = await apiService.changeProviderPassword({
-        providerId,
-        password,
-      });
-      if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
-      alert("Senha do prestador alterada com sucesso!");
-      await loadInitialData(currentUser?.role);
-    } catch (err) {
-      console.error("Erro ao alterar senha do prestador:", err);
-      alert("Não foi possível alterar a senha do prestador. Tente novamente.");
     }
   };
 
@@ -675,6 +710,7 @@ function App() {
 
   const handleDeleteCompany = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta empresa?")) return;
+
     try {
       await apiService.updateCompany(id, { isActive: false });
       await loadInitialData();
@@ -684,7 +720,7 @@ function App() {
     }
   };
 
-  // Alterar senha da empresa
+  // Alterar senha da empresa (usa endpoint dedicado)
   const handleChangeCompanyPassword = async (
     companyId: string,
     password: string
@@ -718,10 +754,7 @@ function App() {
     }
   };
 
-  const handleUpdateService = async (
-    id: string,
-    serviceData: Partial<Service>
-  ) => {
+  const handleUpdateService = async (id: string, serviceData: Partial<Service>) => {
     try {
       await apiService.updateService(id, serviceData);
       await loadInitialData();
@@ -733,6 +766,7 @@ function App() {
 
   const handleDeleteService = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este serviço?")) return;
+
     try {
       await apiService.deleteService(id);
       await loadInitialData();
@@ -744,9 +778,7 @@ function App() {
 
   // Admin users
   const handleAddAdmin = async (
-    adminData: Omit<User, "id" | "createdAt" | "updatedAt"> & {
-      password?: string;
-    }
+    adminData: Omit<User, "id" | "createdAt" | "updatedAt"> & { password?: string }
   ) => {
     try {
       await apiService.createUser({
@@ -778,6 +810,7 @@ function App() {
 
   const handleDeleteAdmin = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este administrador?")) return;
+
     try {
       await apiService.updateUser(id, { isActive: false });
       await loadInitialData();
@@ -797,25 +830,21 @@ function App() {
   };
 
   const getFilteredData = () => {
-    if (!currentUser) return { appointments: [], companies: [], employees: [] };
+    if (!currentUser)
+      return { appointments: [] as Appointment[], companies: [] as Company[], employees: [] as Employee[] };
+
     switch (currentUser.role) {
       case "company": {
-        const userCompany = companies.find(
-          (c) => c.id === currentUser.companyId
-        );
+        const userCompany = companies.find((c) => c.id === currentUser.companyId);
         return {
-          appointments: appointments.filter(
-            (apt) => apt.companyId === currentUser.companyId
-          ),
+          appointments: appointments.filter((apt) => apt.companyId === currentUser.companyId),
           companies: userCompany ? [userCompany] : [],
           employees: userCompany ? userCompany.employees : [],
         };
       }
       case "provider":
         return {
-          appointments: appointments.filter(
-            (apt) => apt.providerId === currentUser.id
-          ),
+          appointments: appointments.filter((apt) => apt.providerId === currentUser.id),
           companies,
           employees: companies.flatMap((c) => c.employees),
         };
@@ -830,6 +859,7 @@ function App() {
 
   const renderMainContent = () => {
     if (!currentUser) return null;
+
     const filteredData = getFilteredData();
 
     if (currentUser.role === "company") {
@@ -895,9 +925,7 @@ function App() {
                   currentDate={currentDate}
                   appointments={filteredData.appointments}
                   companies={companies}
-                  onTimeSlotClick={(date, time) =>
-                    handleTimeSlotClick(date, time)
-                  }
+                  onTimeSlotClick={(date, time) => handleTimeSlotClick(date, time)}
                   onCompanyClick={handleCompanyClick}
                 />
               )}
@@ -906,9 +934,7 @@ function App() {
                   currentDate={currentDate}
                   appointments={filteredData.appointments}
                   companies={companies}
-                  onTimeSlotClick={(time) =>
-                    handleTimeSlotClick(currentDate, time)
-                  }
+                  onTimeSlotClick={(time) => handleTimeSlotClick(currentDate, time)}
                   onCompanyClick={handleCompanyClick}
                 />
               )}
@@ -923,7 +949,14 @@ function App() {
             onAddProvider={handleAddProvider}
             onUpdateProvider={handleUpdateProvider}
             onDeleteProvider={handleDeleteProvider}
-            onChangeProviderPassword={handleChangeProviderPassword}
+            onChangeProviderPassword={async (providerId, password) => {
+              const res = await apiService.updateProviderPassword(providerId, password);
+              if (!res.success) {
+                alert(res.message || "Falha ao alterar senha do prestador");
+              } else {
+                alert("Senha do prestador alterada!");
+              }
+            }}
           />
         );
 
@@ -956,18 +989,14 @@ function App() {
             onAddAdmin={handleAddAdmin}
             onUpdateAdmin={handleUpdateAdmin}
             onDeleteAdmin={handleDeleteAdmin}
-            currentUserId={currentUser!.id}
+            currentUserId={currentUser.id}
           />
         );
       }
 
       case "reports":
         return (
-          <ReportsPage
-            appointments={filteredData.appointments}
-            providers={providers}
-            companies={companies}
-          />
+          <ReportsPage appointments={filteredData.appointments} providers={providers} companies={companies} />
         );
 
       case "logo-customization":
@@ -996,16 +1025,26 @@ function App() {
     }
   };
 
-  // ✅ Early return da página pública ANTES do check de autenticação
+  // ———— RENDERIZAÇÃO PÚBLICA (sem login) ————
   if (isPublicBookingPage()) {
     const token = getBookingToken();
+    if (!token) return null;
+
+    if (!publicReady) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-gray-600">
+          Carregando horários...
+        </div>
+      );
+    }
+
     return (
       <PublicBooking
-        companyToken={token!}
+        companyToken={token}
         companies={companies}
         providers={providers}
         services={services}
-        availableTimeSlots={availableTimeSlots}
+        availableTimeSlots={[]} // não necessário na pública
         appointments={appointments}
         onBookAppointment={handlePublicBookAppointment}
         onAddEmployee={handleAddEmployeeFromPublic}
@@ -1013,24 +1052,23 @@ function App() {
     );
   }
 
+  // Login
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
   }
 
+  // App autenticado
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
         currentUser={currentUser!}
         onLogout={handleLogout}
         onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
-        showMenuButton={
-          currentUser!.role === "admin" || currentUser!.role === "provider"
-        }
+        showMenuButton={currentUser!.role === "admin" || currentUser!.role === "provider"}
       />
 
       <div className="flex">
-        {(currentUser!.role === "admin" ||
-          currentUser!.role === "provider") && (
+        {(currentUser!.role === "admin" || currentUser!.role === "provider") && (
           <Sidebar
             userRole={currentUser!.role}
             activeTab={activeTab}
@@ -1040,11 +1078,7 @@ function App() {
           />
         )}
 
-        <main
-          className={`flex-1 overflow-hidden ${
-            currentUser!.role === "company" ? "" : "lg:ml-0"
-          }`}
-        >
+        <main className={`flex-1 overflow-hidden ${currentUser!.role === "company" ? "" : "lg:ml-0"}`}>
           <div className="h-full p-3 sm:p-6">
             <div className="bg-white rounded-lg shadow-sm h-full relative">
               {dataError && (
