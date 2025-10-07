@@ -1,52 +1,75 @@
-import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, User, Clock, MapPin, Phone, Mail, Key, Lock } from 'lucide-react';
-import { Provider } from '../../types';
+import React, { useState } from "react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  User,
+  Clock,
+  MapPin,
+  Phone,
+  Mail,
+  Key,
+  Lock,
+} from "lucide-react";
+import { Provider } from "../../types";
 
 interface ProviderManagementProps {
   providers: Provider[];
-  onAddProvider: (provider: Omit<Provider, 'id'>, options?: { password?: string }) => void | Promise<void>;
-  onUpdateProvider: (id: string, provider: Partial<Provider>) => void | Promise<void>;
+  onAddProvider: (
+    provider: Omit<Provider, "id">,
+    options?: { password?: string }
+  ) => void | Promise<void>;
+  onUpdateProvider: (
+    id: string,
+    provider: Partial<Provider>
+  ) => void | Promise<void>;
   onDeleteProvider: (id: string) => void | Promise<void>;
-  onChangeProviderPassword: (providerId: string, password: string) => void | Promise<void>;
+  onChangeProviderPassword: (
+    providerId: string,
+    password: string
+  ) => Promise<void> | void;
 }
 
 export default function ProviderManagement({
   providers,
   onAddProvider,
   onUpdateProvider,
-  onDeleteProvider
+  onDeleteProvider,
+  onChangeProviderPassword,
 }: ProviderManagementProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
-  const [selectedProviderForPassword, setSelectedProviderForPassword] = useState<Provider | null>(null);
-  const [newPassword, setNewPassword] = useState('');
+  const [selectedProviderForPassword, setSelectedProviderForPassword] =
+    useState<Provider | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
+    name: "",
+    email: "",
+    phone: "",
     specialties: [] as string[],
     workingHours: {
-      start: '06:00',
-      end: '00:00',
-      days: [1, 2, 3, 4, 5]
-    }
+      start: "06:00",
+      end: "00:00",
+      days: [1, 2, 3, 4, 5],
+    },
   });
 
   const specialtyOptions = [
-    'Massagem Relaxante',
-    'Massagem Desportiva',
-    'Quick Massage',
-    'Massagem Terapêutica',
-    'Reflexologia',
-    'Shiatsu',
-    'Drenagem Linfática',
-    'Massagem Modeladora'
+    "Massagem Relaxante",
+    "Massagem Desportiva",
+    "Quick Massage",
+    "Massagem Terapêutica",
+    "Reflexologia",
+    "Shiatsu",
+    "Drenagem Linfática",
+    "Massagem Modeladora",
   ];
 
   const generatePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*';
-    let password = '';
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*";
+    let password = "";
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
@@ -55,60 +78,67 @@ export default function ProviderManagement({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingProvider) {
       onUpdateProvider(editingProvider.id, {
         ...formData,
-        breaks: editingProvider.breaks
+        breaks: editingProvider.breaks,
       });
     } else {
       const password = generatePassword();
       onAddProvider({
         ...formData,
-        breaks: []
+        breaks: [],
       });
-      alert(`Prestador cadastrado com sucesso!\n\nDados de acesso:\nEmail: ${formData.email}\nSenha: ${password}\n\nAnote estes dados para fornecer ao prestador.`);
+      alert(
+        `Prestador cadastrado com sucesso!\n\nDados de acesso:\nEmail: ${formData.email}\nSenha: ${password}\n\nAnote estes dados para fornecer ao prestador.`
+      );
     }
-    
+
     resetForm();
   };
 
   const handlePasswordChange = async () => {
     if (!selectedProviderForPassword || !newPassword) {
-      alert('Por favor, digite uma nova senha.');
+      alert("Por favor, digite uma nova senha.");
       return;
     }
 
     try {
-      await onChangeProviderPassword(selectedProviderForPassword.id, newPassword);
-      alert(`Senha alterada com sucesso para ${selectedProviderForPassword.name}!`);
+      await onChangeProviderPassword(
+        selectedProviderForPassword.id,
+        newPassword
+      );
+      alert(
+        `Senha alterada com sucesso para ${selectedProviderForPassword.name}!`
+      );
     } catch (error) {
-      console.error('Erro ao alterar senha do prestador:', error);
-      alert('Não foi possível alterar a senha. Tente novamente.');
+      console.error("Erro ao alterar senha do prestador:", error);
+      alert("Não foi possível alterar a senha. Tente novamente.");
     } finally {
       setIsPasswordModalOpen(false);
       setSelectedProviderForPassword(null);
-      setNewPassword('');
+      setNewPassword("");
     }
   };
 
   const openPasswordModal = (provider: Provider) => {
     setSelectedProviderForPassword(provider);
-    setNewPassword('');
+    setNewPassword("");
     setIsPasswordModalOpen(true);
   };
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      email: '',
-      phone: '',
+      name: "",
+      email: "",
+      phone: "",
       specialties: [],
       workingHours: {
-        start: '06:00',
-        end: '00:00',
-        days: [1, 2, 3, 4, 5]
-      }
+        start: "06:00",
+        end: "00:00",
+        days: [1, 2, 3, 4, 5],
+      },
     });
     setEditingProvider(null);
     setIsFormOpen(false);
@@ -120,21 +150,23 @@ export default function ProviderManagement({
       email: provider.email,
       phone: provider.phone,
       specialties: provider.specialties,
-      workingHours: provider.workingHours
+      workingHours: provider.workingHours,
     });
     setEditingProvider(provider);
     setIsFormOpen(true);
   };
 
   const getDayNames = (days: number[]) => {
-    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    return days.map(day => dayNames[day]).join(', ');
+    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    return days.map((day) => dayNames[day]).join(", ");
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Gestão de Prestadores</h2>
+        <h2 className="text-2xl font-bold text-gray-900">
+          Gestão de Prestadores
+        </h2>
         <button
           onClick={() => setIsFormOpen(true)}
           className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -146,14 +178,19 @@ export default function ProviderManagement({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {providers.map((provider) => (
-          <div key={provider.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div
+            key={provider.id}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+          >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                   <User className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                  <h3 className="font-semibold text-gray-900">
+                    {provider.name}
+                  </h3>
                   <p className="text-sm text-gray-600">{provider.email}</p>
                 </div>
               </div>
@@ -201,7 +238,9 @@ export default function ProviderManagement({
               </div>
 
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Especialidades:</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Especialidades:
+                </p>
                 <div className="flex flex-wrap gap-1">
                   {provider.specialties.map((specialty) => (
                     <span
@@ -224,7 +263,7 @@ export default function ProviderManagement({
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
-                {editingProvider ? 'Editar Prestador' : 'Novo Prestador'}
+                {editingProvider ? "Editar Prestador" : "Novo Prestador"}
               </h3>
             </div>
 
@@ -237,7 +276,9 @@ export default function ProviderManagement({
                   <input
                     type="text"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -250,7 +291,9 @@ export default function ProviderManagement({
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -264,7 +307,9 @@ export default function ProviderManagement({
                 <input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="(11) 99999-9999"
                   required
@@ -277,7 +322,10 @@ export default function ProviderManagement({
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {specialtyOptions.map((specialty) => (
-                    <label key={specialty} className="flex items-center space-x-2">
+                    <label
+                      key={specialty}
+                      className="flex items-center space-x-2"
+                    >
                       <input
                         type="checkbox"
                         checked={formData.specialties.includes(specialty)}
@@ -285,12 +333,14 @@ export default function ProviderManagement({
                           if (e.target.checked) {
                             setFormData({
                               ...formData,
-                              specialties: [...formData.specialties, specialty]
+                              specialties: [...formData.specialties, specialty],
                             });
                           } else {
                             setFormData({
                               ...formData,
-                              specialties: formData.specialties.filter(s => s !== specialty)
+                              specialties: formData.specialties.filter(
+                                (s) => s !== specialty
+                              ),
                             });
                           }
                         }}
@@ -310,10 +360,15 @@ export default function ProviderManagement({
                   <input
                     type="time"
                     value={formData.workingHours.start}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      workingHours: { ...formData.workingHours, start: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        workingHours: {
+                          ...formData.workingHours,
+                          start: e.target.value,
+                        },
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -325,10 +380,15 @@ export default function ProviderManagement({
                   <input
                     type="time"
                     value={formData.workingHours.end}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      workingHours: { ...formData.workingHours, end: e.target.value }
-                    })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        workingHours: {
+                          ...formData.workingHours,
+                          end: e.target.value,
+                        },
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -339,35 +399,42 @@ export default function ProviderManagement({
                   Dias de Trabalho
                 </label>
                 <div className="grid grid-cols-7 gap-2">
-                  {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
-                    <label key={day} className="flex flex-col items-center space-y-1">
-                      <input
-                        type="checkbox"
-                        checked={formData.workingHours.days.includes(index)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({
-                              ...formData,
-                              workingHours: {
-                                ...formData.workingHours,
-                                days: [...formData.workingHours.days, index]
-                              }
-                            });
-                          } else {
-                            setFormData({
-                              ...formData,
-                              workingHours: {
-                                ...formData.workingHours,
-                                days: formData.workingHours.days.filter(d => d !== index)
-                              }
-                            });
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="text-xs text-gray-700">{day}</span>
-                    </label>
-                  ))}
+                  {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(
+                    (day, index) => (
+                      <label
+                        key={day}
+                        className="flex flex-col items-center space-y-1"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.workingHours.days.includes(index)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                workingHours: {
+                                  ...formData.workingHours,
+                                  days: [...formData.workingHours.days, index],
+                                },
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                workingHours: {
+                                  ...formData.workingHours,
+                                  days: formData.workingHours.days.filter(
+                                    (d) => d !== index
+                                  ),
+                                },
+                              });
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-gray-700">{day}</span>
+                      </label>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -376,8 +443,9 @@ export default function ProviderManagement({
                   <div className="flex items-center space-x-2">
                     <Key className="w-5 h-5 text-green-600" />
                     <p className="text-sm text-green-800">
-                      <strong>Importante:</strong> Uma senha será gerada automaticamente para o prestador. 
-                      Anote os dados de acesso que serão exibidos após o cadastro.
+                      <strong>Importante:</strong> Uma senha será gerada
+                      automaticamente para o prestador. Anote os dados de acesso
+                      que serão exibidos após o cadastro.
                     </p>
                   </div>
                 </div>
@@ -395,7 +463,7 @@ export default function ProviderManagement({
                   type="submit"
                   className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                 >
-                  {editingProvider ? 'Atualizar' : 'Cadastrar'}
+                  {editingProvider ? "Atualizar" : "Cadastrar"}
                 </button>
               </div>
             </form>
@@ -443,8 +511,8 @@ export default function ProviderManagement({
 
               <div className="bg-orange-50 p-3 rounded-lg">
                 <p className="text-sm text-orange-800">
-                  <strong>Importante:</strong> Anote a nova senha e forneça ao prestador. 
-                  Por segurança, a senha não será exibida novamente.
+                  <strong>Importante:</strong> Anote a nova senha e forneça ao
+                  prestador. Por segurança, a senha não será exibida novamente.
                 </p>
               </div>
 
@@ -453,7 +521,7 @@ export default function ProviderManagement({
                   onClick={() => {
                     setIsPasswordModalOpen(false);
                     setSelectedProviderForPassword(null);
-                    setNewPassword('');
+                    setNewPassword("");
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                 >
