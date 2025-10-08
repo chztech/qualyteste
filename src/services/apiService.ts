@@ -1,4 +1,3 @@
-// services/apiService.ts
 import {
   Appointment,
   Company,
@@ -23,7 +22,8 @@ class ApiService {
 
   constructor() {
     const envBaseUrl =
-      import.meta.env.VITE_API_BASE_URL ?? "https://qualycorpore.chztech.com.br/api";
+      import.meta.env.VITE_API_BASE_URL ??
+      "https://qualycorpore.chztech.com.br/api";
     this.baseUrl = envBaseUrl;
 
     this.token = localStorage.getItem("authToken");
@@ -39,18 +39,16 @@ class ApiService {
     localStorage.removeItem("authToken");
   }
 
-  // ====== infra de requisição ======
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {},
-    includeAuth: boolean = true
+    options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`;
 
       const headers: HeadersInit = {
         "Content-Type": "application/json",
-        ...(options.headers || {}),
+        ...options.headers,
       };
 
       const fetchOptions: RequestInit = {
@@ -59,7 +57,6 @@ class ApiService {
         credentials: "include",
       };
 
-      // Se o body for FormData, remover Content-Type
       if (fetchOptions.body instanceof FormData) {
         delete (fetchOptions.headers as Record<string, string>)["Content-Type"];
       } else if (
@@ -70,8 +67,7 @@ class ApiService {
         fetchOptions.body = JSON.stringify(fetchOptions.body);
       }
 
-      // Auth header quando necessário
-      if (includeAuth && this.token) {
+      if (this.token) {
         fetchOptions.headers = {
           ...fetchOptions.headers,
           Authorization: `Bearer ${this.token}`,
@@ -79,33 +75,19 @@ class ApiService {
       }
 
       const response = await fetch(url, fetchOptions);
-
-      // tenta parsear JSON com fallback
-      let data: any = null;
-      try {
-        data = await response.json();
-      } catch {
-        // se não vier json, retorna erro genérico
-        if (!response.ok) {
-          return {
-            success: false,
-            error: `HTTP ${response.status}: ${response.statusText}`,
-          };
-        }
-        // se vier 200 mas sem json, retorna sucesso vazio
-        return { success: true } as ApiResponse<T>;
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         return {
           success: false,
-          error: data?.error || `HTTP ${response.status}: ${response.statusText}`,
+          error:
+            data.error || `HTTP ${response.status}: ${response.statusText}`,
         };
       }
 
       return {
         success: true,
-        data: data.data ?? data,
+        data: data.data || data,
         message: data.message,
       };
     } catch (error) {
@@ -117,7 +99,6 @@ class ApiService {
     }
   }
 
-  // ====== mapeadores ======
   private mapEmployee(record: any): Employee {
     return {
       id: record.id,
@@ -125,8 +106,8 @@ class ApiService {
       name: record.name ?? "",
       phone: record.phone ?? null,
       department: record.department ?? null,
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
@@ -140,21 +121,23 @@ class ApiService {
       notes: record.notes ?? null,
       publicToken: record.publicToken ?? record.public_token ?? null,
       employees: Array.isArray(record.employees)
-        ? record.employees.map((e: any) => this.mapEmployee(e))
+        ? record.employees.map((employee: any) => this.mapEmployee(employee))
         : [],
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
   private parseJson<T>(value: unknown, fallback: T): T {
     if (value === null || value === undefined) return fallback;
-    if (Array.isArray(value) || typeof value === "object") return value as T;
+    if (Array.isArray(value) || typeof value === "object") {
+      return value as T;
+    }
     if (typeof value === "string") {
       try {
         const parsed = JSON.parse(value);
-        return (parsed ?? fallback) as T;
-      } catch {
+        return parsed ?? fallback;
+      } catch (error) {
         return fallback;
       }
     }
@@ -179,8 +162,8 @@ class ApiService {
       workingHours,
       breaks: breaks ?? [],
       isActive: record.isActive ?? record.is_active ?? true,
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
@@ -195,8 +178,8 @@ class ApiService {
           ? Number(record.price)
           : null,
       isActive: record.isActive ?? record.is_active ?? true,
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
@@ -218,8 +201,8 @@ class ApiService {
       providerName: record.providerName ?? record.provider_name ?? null,
       serviceName: record.serviceName ?? record.service_name ?? null,
       employeeName: record.employeeName ?? record.employee_name ?? null,
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
@@ -232,12 +215,12 @@ class ApiService {
       role: record.role ?? "client",
       companyId: record.companyId ?? record.company_id ?? null,
       isActive: record.isActive ?? record.is_active ?? true,
-      createdAt: record.createdAt ?? record.created_at ?? null,
-      updatedAt: record.updatedAt ?? record.updated_at ?? null,
+      createdAt: record.createdAt ?? record.created_at,
+      updatedAt: record.updatedAt ?? record.updated_at,
     };
   }
 
-  // ====== Auth ======
+  // Auth -------------------------------------------------
   async login(email: string, password: string) {
     return this.request<{ user: any; token: string }>("/auth/login.php", {
       method: "POST",
@@ -251,24 +234,7 @@ class ApiService {
     });
   }
 
-  // ====== Public (sem token) ======
-  async getPublicCompany(companyId: string) {
-    // GET /companies/public.php?id=...
-    return this.request<any>(`/companies/public.php?id=${encodeURIComponent(companyId)}`, {
-      method: "GET",
-    }, /* includeAuth */ false);
-  }
-
-  async getPublicAppointments(companyId: string) {
-    // GET /appointments/public.php?companyId=...
-    return this.request<any[]>(
-      `/appointments/public.php?companyId=${encodeURIComponent(companyId)}`,
-      { method: "GET" },
-      /* includeAuth */ false
-    );
-  }
-
-  // ====== Companies ======
+  // Companies -------------------------------------------
   async getCompanies() {
     const response = await this.request<any[]>("/companies/index.php", {
       method: "GET",
@@ -280,6 +246,7 @@ class ApiService {
         data: response.data.map((record: any) => this.mapCompany(record)),
       } as ApiResponse<Company[]>;
     }
+
     return response as ApiResponse<Company[]>;
   }
 
@@ -313,11 +280,11 @@ class ApiService {
         data: this.mapCompany(response.data),
       } as ApiResponse<Company>;
     }
+
     return response as ApiResponse<Company>;
   }
 
   async updateCompany(id: string, payload: Partial<Company>) {
-    // mantém apenas campos aceitos no backend
     const response = await this.request<any>("/companies/update.php", {
       method: "POST",
       body: {
@@ -327,7 +294,6 @@ class ApiService {
         phone: payload.phone,
         email: payload.email,
         notes: payload.notes,
-        isActive: (payload as any).isActive, // opcional
         employees: (payload.employees ?? []).map((employee) => ({
           id: employee.id,
           name: employee.name,
@@ -340,23 +306,25 @@ class ApiService {
     return response as ApiResponse<{ id: string; employees?: Employee[] }>;
   }
 
-  // método 1: "excluir" marcando is_active = false
-  async deleteCompany(id: string) {
-    return this.request<{ id: string }>("/companies/update.php", {
-      method: "POST",
-      body: { id, isActive: false },
+  // 🔓 PÚBLICO: obter uma empresa por ID (sem exigir auth token)
+  async getPublicCompany(companyId: string) {
+    // endpoint público no backend; implemente /public/company.php?id=<companyId>
+    return this.request<any>(`/public/company.php?id=${encodeURIComponent(companyId)}`, {
+      method: "GET",
+      // NÃO injeta Authorization aqui manualmente; request() só injeta se existir token
     });
   }
 
-  // alterar senha da empresa (endpoint dedicado)
-  async changeCompanyPassword(companyId: string, password: string) {
-    return this.request<{ message: string }>("/companies/password.php", {
-      method: "PUT",
-      body: { companyId, password },
-    });
+  // 🔓 PÚBLICO: obter appointments abertos para uma empresa
+  async getPublicAppointments(companyId: string) {
+    // endpoint público no backend; implemente /public/appointments.php?companyId=...
+    return this.request<any[]>(
+      `/public/appointments.php?companyId=${encodeURIComponent(companyId)}`,
+      { method: "GET" }
+    );
   }
 
-  // ====== Providers ======
+  // Providers -------------------------------------------
   async getProviders() {
     const response = await this.request<any[]>("/providers/index.php", {
       method: "GET",
@@ -370,6 +338,14 @@ class ApiService {
     }
 
     return response as ApiResponse<Provider[]>;
+  }
+
+  // 🔑 Alterar senha da empresa
+  async changeCompanyPassword(companyId: string, password: string) {
+    return this.request<{ message: string }>("/companies/password.php", {
+      method: "PUT",
+      body: { companyId, password },
+    });
   }
 
   async createProvider(payload: {
@@ -418,24 +394,12 @@ class ApiService {
         workingHours: payload.workingHours,
         breaks: payload.breaks,
         userId: payload.userId,
-        isActive: (payload as any).isActive,
       },
     });
 
     return response as ApiResponse<{ id: string }>;
   }
 
-  async updateProviderPassword(providerId: string, password: string) {
-    return this.request<{ success: boolean; message?: string }>(
-      "/providers/password.php",
-      {
-        method: "PUT",
-        body: { providerId, password },
-      }
-    );
-  }
-
-  // ====== Services ======
   async getServices() {
     const response = await this.request<any[]>("/services/index.php", {
       method: "GET",
@@ -451,13 +415,22 @@ class ApiService {
     return response as ApiResponse<Service[]>;
   }
 
+  async updateProviderPassword(providerId: string, password: string) {
+    return this.request<{ success: boolean; message?: string }>(
+      "/providers/password.php",
+      {
+        method: "PUT",
+        body: { providerId, password },
+      }
+    );
+  }
+
   async createService(payload: {
     name: string;
     duration: number;
     description?: string;
     price?: number | null;
   }) {
-    // Observação: seu backend atual está usando POST em /services/index.php
     const response = await this.request<any>("/services/index.php", {
       method: "POST",
       body: payload,
@@ -486,17 +459,22 @@ class ApiService {
   }
 
   async deleteService(id: string) {
-    return this.request<{ id: string }>(`/services/index.php?id=${encodeURIComponent(id)}`, {
+    return this.request<{ id: string }>(`/services/index.php?id=${id}`, {
       method: "DELETE",
     });
   }
 
-  // ====== Appointments ======
+  // Appointments ---------------------------------------
   async getAppointments(params?: Record<string, string>) {
-    const queryString = params ? `?${new URLSearchParams(params).toString()}` : "";
-    const response = await this.request<any[]>(`/appointments/index.php${queryString}`, {
-      method: "GET",
-    });
+    const queryString = params
+      ? `?${new URLSearchParams(params).toString()}`
+      : "";
+    const response = await this.request<any[]>(
+      `/appointments/index.php${queryString}`,
+      {
+        method: "GET",
+      }
+    );
 
     if (response.success && Array.isArray(response.data)) {
       return {
@@ -527,7 +505,6 @@ class ApiService {
     });
 
     if (response.success && response.data) {
-      // resposta pode devolver parcialmente; mescla e mapeia
       return {
         ...response,
         data: this.mapAppointment({ ...payload, ...response.data }),
@@ -540,7 +517,10 @@ class ApiService {
   async updateAppointment(id: string, payload: Partial<Appointment>) {
     return this.request<{ id: string }>("/appointments/update.php", {
       method: "POST",
-      body: { id, ...payload },
+      body: {
+        id,
+        ...payload,
+      },
     });
   }
 
@@ -551,7 +531,7 @@ class ApiService {
     });
   }
 
-  // ====== Users ======
+  // Users ----------------------------------------------
   async getUsers(role?: string) {
     const query = role ? `?role=${encodeURIComponent(role)}` : "";
     const response = await this.request<any[]>(`/users/index.php${query}`, {
