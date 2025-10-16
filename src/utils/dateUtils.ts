@@ -172,6 +172,35 @@ export function endOfWeekYMD(date: Date, weekStartsOn: 0 | 1 = 1): string {
   return toISODate(endOfWeek(date, weekStartsOn));
 }
 
+/** Início do mês (Date). */
+export function startOfMonth(date: Date): Date {
+  const d = clone(date);
+  d.setDate(1);
+  return startOfDay(d);
+}
+
+/** Fim do mês (Date). */
+export function endOfMonth(date: Date): Date {
+  const d = clone(date);
+  d.setMonth(d.getMonth() + 1, 0); // último dia do mês atual
+  return endOfDay(d);
+}
+
+/** Intervalo do mês da data informada. */
+export function getMonthRange(date: Date): { start: Date; end: Date } {
+  return { start: startOfMonth(date), end: endOfMonth(date) };
+}
+
+/** Início do mês em "YYYY-MM-DD". */
+export function startOfMonthYMD(date: Date): string {
+  return toISODate(startOfMonth(date));
+}
+
+/** Fim do mês em "YYYY-MM-DD". */
+export function endOfMonthYMD(date: Date): string {
+  return toISODate(endOfMonth(date));
+}
+
 /**
  * Matriz do mês (6 x 7) começando na segunda por padrão.
  * Cada linha = semana; cada item = Date do dia.
