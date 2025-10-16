@@ -33,10 +33,14 @@ export function toISODate(date: Date): string {
   return `${date.getFullYear()}-${zp(date.getMonth() + 1)}-${zp(date.getDate())}`;
 }
 
+/** Alias usado em alguns componentes (ex.: MonthView). */
+export function toYMD(date: Date): string {
+  return toISODate(date);
+}
+
 /** Cria um Date (LOCAL) a partir de "YYYY-MM-DD" (meia-noite local). */
 export function fromISODate(dateStr: string): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
-  // new Date(year, monthIndex, day) usa fuso LOCAL
   return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
 }
 
@@ -115,7 +119,7 @@ export function formatDate(
   return new Intl.DateTimeFormat(locale, options).format(d);
 }
 
-/** Formata "segunda, 14/10/2025" (weekday curto + dd/mm/aaaa). */
+/** Formata "segunda, 14/10/2025" (weekday + dd/mm/aaaa). */
 export function formatDateWithWeekday(
   date: Date | string,
   locale = "pt-BR"
