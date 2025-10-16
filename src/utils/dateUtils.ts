@@ -1,11 +1,5 @@
 // src/utils/dateUtils.ts
 
-/**
- * Utilitários de data/hora SEM surpresas de timezone:
- * - Sempre tratamos "datas" (YYYY-MM-DD) como meia-noite no fuso LOCAL.
- * - Não usamos Date.toISOString() para montar datas de calendário.
- */
-
 /** Zero-pad */
 const zp = (n: number, len = 2) => n.toString().padStart(len, "0");
 
@@ -146,6 +140,26 @@ export function getWeekRange(
   const start = addDays(base, -diff);
   const end = endOfDay(addDays(start, 6));
   return { start, end };
+}
+
+/** Início da semana (Date), opcionalmente definindo se começa no dom(0) ou seg(1). */
+export function startOfWeek(date: Date, weekStartsOn: 0 | 1 = 1): Date {
+  return getWeekRange(date, weekStartsOn).start;
+}
+
+/** Fim da semana (Date). */
+export function endOfWeek(date: Date, weekStartsOn: 0 | 1 = 1): Date {
+  return getWeekRange(date, weekStartsOn).end;
+}
+
+/** Início da semana em "YYYY-MM-DD". */
+export function startOfWeekYMD(date: Date, weekStartsOn: 0 | 1 = 1): string {
+  return toISODate(startOfWeek(date, weekStartsOn));
+}
+
+/** Fim da semana em "YYYY-MM-DD". */
+export function endOfWeekYMD(date: Date, weekStartsOn: 0 | 1 = 1): string {
+  return toISODate(startOfWeek(addDays(endOfWeek(date, weekStartsOn), 0)));
 }
 
 /**
