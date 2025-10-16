@@ -71,6 +71,12 @@ export function areSameDay(a: Date, b: Date): boolean {
   );
 }
 
+/** É hoje? Aceita Date ou "YYYY-MM-DD". */
+export function isToday(date: Date | string): boolean {
+  const d = typeof date === "string" ? fromISODate(date) : date;
+  return areSameDay(d, new Date());
+}
+
 /** "HH:mm" -> minutos. */
 export function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
@@ -265,9 +271,7 @@ export function isSameMonth(date: Date, ref: Date): boolean {
 
 /** Útil para debug. */
 export function debugISO(date: Date): string {
-  return (
-    toISODate(date) + ` ${zp(date.getHours())}:${zp(date.getMinutes())}`
-  );
+  return toISODate(date) + ` ${zp(date.getHours())}:${zp(date.getMinutes())}`;
 }
 
 /** Turno a partir de "HH:mm". */
