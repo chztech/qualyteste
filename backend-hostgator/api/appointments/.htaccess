@@ -2,10 +2,10 @@
 
 <IfModule mod_headers.c>
     # Se quiser liberar mais de uma origem:
-    # SetEnvIf Origin "^(https://corpore\.netlify\.app|http://localhost:5173)$" ORIGIN=$0
+    # SetEnvIf Origin "^(https://qualycorpore\.netlify\.app|http://localhost:5173)$" ORIGIN=$0
     # Header always set Access-Control-Allow-Origin %{ORIGIN}e env=ORIGIN
     # Se for só produção:
-    Header always set Access-Control-Allow-Origin "https://corpore.netlify.app"
+    Header always set Access-Control-Allow-Origin "https://qualycorpore.netlify.app"
 
     Header always set Vary "Origin"
     Header always set Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
