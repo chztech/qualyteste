@@ -502,16 +502,23 @@ class ApiService {
   }) {
     const body: any = {
       date: payload.date,
-      start_time: payload.startTime,
-      end_time: payload.endTime,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
       duration: payload.duration,
       status: payload.status,
+      companyId: payload.companyId,
+      providerId: payload.providerId,
+      clientId: payload.clientId,
+      employeeId: payload.employeeId,
+      serviceId: payload.serviceId,
+      notes: payload.notes,
+      start_time: payload.startTime,
+      end_time: payload.endTime,
       company_id: payload.companyId,
       provider_id: payload.providerId,
       client_id: payload.clientId,
       employee_id: payload.employeeId,
       service_id: payload.serviceId,
-      notes: payload.notes,
     };
     Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
 
