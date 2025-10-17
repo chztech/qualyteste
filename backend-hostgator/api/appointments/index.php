@@ -2,186 +2,266 @@
 require_once '../config/cors.php';
 require_once '../helpers/functions.php';
 
-$method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+/**
+ * /appointments/index.php
+ *
+ * GET  (público): lista agendamentos (por padrão, apenas FUTUROS quando não autenticado)
+ *      Parâmetros opcionais:
+ *        - companyId
+ *        - providerId
+ *        - status (scheduled|confirmed|completed|cancelled)
+ *        - date_from (YYYY-MM-DD)
+ *        - date_to   (YYYY-MM-DD)
+ *
+ * GET (autenticado): se houver token válido, remove a restrição de "apenas futuros".
+ *
+ * POST (admin): cria novo agendamento
+ *      Campos esperados (JSON ou form-data):
+ *        - date (YYYY-MM-DD)
+ *        - startTime (HH:MM)
+ *        - endTime   (HH:MM) [opcional; será calculado se duration informado]
+ *        - duration  (minutos)
+ *        - status    (default "scheduled")
+ *        - companyId (string) [recomendado]
+ *        - providerId, clientId, employeeId, serviceId (opcionais)
+ *        - notes (opcional)
+ */
+
+// Resposta imediata para OPTIONS (CORS)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+  http_response_code(200);
+  exit();
 }
 
-$auth = requireAuth();
 $database = new Database();
 $db = $database->getConnection();
 
-$raw = file_get_contents('php://input');
-$payload = json_decode($raw, true);
-if (!is_array($payload)) {
-    $payload = $_POST;
+$method = $_SERVER['REQUEST_METHOD'];
+
+/**
+ * Função auxiliar para ler body JSON/POST
+ */
+function readBody(): array {
+  $raw = file_get_contents('php://input');
+  $data = json_decode($raw, true);
+  if (!is_array($data)) {
+    $data = $_POST;
+  }
+  return $data;
 }
 
 /**
- * Resolve o company_id quando o usuário é 'company' e o token não trouxe ou veio nulo.
+ * Tenta autenticar; se falhar, retorna null (para GET público).
+ * Se seu helpers.php não tiver requireAuthOptional, fazemos try/catch simples.
  */
-function resolveCompanyIdForCompanyRole(PDO $db, array $auth): ?string {
-    if (!isset($auth['role']) || $auth['role'] !== 'company') {
-        return null;
-    }
-    if (!empty($auth['company_id'])) {
-        return $auth['company_id'];
-    }
-    if (empty($auth['user_id'])) {
-        return null;
-    }
-    $stmt = $db->prepare('SELECT company_id FROM users WHERE id = ? LIMIT 1');
-    $stmt->execute([$auth['user_id']]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row && !empty($row['company_id']) ? $row['company_id'] : null;
+function tryAuthOrNull() {
+  try {
+    return requireAuth();
+  } catch (Throwable $e) {
+    return null;
+  }
 }
 
 /**
- * Resolve o provider_id a partir do user_id quando o usuário é 'provider'.
+ * Mapeia um registro de DB para o payload esperado pelo front
  */
-function resolveProviderIdForProviderRole(PDO $db, array $auth): ?string {
-    if (!isset($auth['role']) || $auth['role'] !== 'provider') {
-        return null;
-    }
-    if (!empty($auth['provider_id'])) {
-        return $auth['provider_id'];
-    }
-    if (empty($auth['user_id'])) {
-        return null;
-    }
-    $stmt = $db->prepare('SELECT id FROM providers WHERE user_id = ? LIMIT 1');
-    $stmt->execute([$auth['user_id']]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $row && !empty($row['id']) ? $row['id'] : null;
+function mapAppointmentRow(array $row): array {
+  return [
+    'id'            => $row['id'],
+    'date'          => $row['date'],
+    'start_time'    => $row['start_time'],
+    'end_time'      => $row['end_time'],
+    'duration'      => (int)$row['duration'],
+    'status'        => $row['status'],
+    'company_id'    => $row['company_id'] ?? null,
+    'provider_id'   => $row['provider_id'] ?? null,
+    'client_id'     => $row['client_id'] ?? null,
+    'employee_id'   => $row['employee_id'] ?? null,
+    'service_id'    => $row['service_id'] ?? null,
+    'notes'         => $row['notes'] ?? null,
+    'company_name'  => $row['company_name'] ?? null,
+    'provider_name' => $row['provider_name'] ?? null,
+    'service_name'  => $row['service_name'] ?? null,
+    'employee_name' => $row['employee_name'] ?? null,
+    'created_at'    => $row['created_at'],
+    'updated_at'    => $row['updated_at'],
+  ];
 }
 
-try {
-    if ($method === 'GET') {
-        $filters = [];
-        $params  = [];
+if ($method === 'GET') {
+  // GET pode ser público. Se autenticado, retorna tudo; se não, apenas futuros.
+  $auth = tryAuthOrNull();
 
-        // Filtros de querystring
-        if (!empty($_GET['companyId'])) {
-            $filters[] = 'a.company_id = ?';
-            $params[]  = $_GET['companyId'];
-        }
-        if (!empty($_GET['providerId'])) {
-            $filters[] = 'a.provider_id = ?';
-            $params[]  = $_GET['providerId'];
-        }
-        if (!empty($_GET['status'])) {
-            $filters[] = 'a.status = ?';
-            $params[]  = $_GET['status'];
-        }
-        if (!empty($_GET['dateStart'])) {
-            $filters[] = 'a.date >= ?';
-            $params[]  = $_GET['dateStart'];
-        }
-        if (!empty($_GET['dateEnd'])) {
-            $filters[] = 'a.date <= ?';
-            $params[]  = $_GET['dateEnd'];
-        }
+  $companyId = isset($_GET['companyId']) ? trim($_GET['companyId']) : null;
+  $providerId = isset($_GET['providerId']) ? trim($_GET['providerId']) : null;
+  $status    = isset($_GET['status']) ? trim($_GET['status']) : null;
+  $dateFrom  = isset($_GET['date_from']) ? trim($_GET['date_from']) : null;
+  $dateTo    = isset($_GET['date_to']) ? trim($_GET['date_to']) : null;
 
-        // Restrições por papel
-        $resolvedCompanyId  = resolveCompanyIdForCompanyRole($db, $auth);
-        $resolvedProviderId = resolveProviderIdForProviderRole($db, $auth);
+  $where = [];
+  $params = [];
 
-        if ($auth['role'] === 'company' && $resolvedCompanyId) {
-            $filters[] = 'a.company_id = ?';
-            $params[]  = $resolvedCompanyId;
-        }
+  // Se não autenticado -> restringe a compromissos futuros (hoje em diante)
+  if ($auth === null) {
+    $where[] = 'a.date >= CURDATE()';
+    // opcional: expor apenas status "scheduled" e "confirmed"
+    $where[] = "a.status IN ('scheduled','confirmed')";
+  }
 
-        if ($auth['role'] === 'provider' && $resolvedProviderId) {
-            $filters[] = 'a.provider_id = ?';
-            $params[]  = $resolvedProviderId;
-        }
+  if ($companyId) {
+    $where[] = 'a.company_id = ?';
+    $params[] = $companyId;
+  }
 
-        $query = 'SELECT a.*,
-                    c.name  AS company_name,
-                    p.name  AS provider_name,
-                    s.name  AS service_name,
-                    emp.name AS employee_name
-                  FROM appointments a
-                  LEFT JOIN companies c        ON a.company_id  = c.id
-                  LEFT JOIN providers p        ON a.provider_id = p.id
-                  LEFT JOIN services s         ON a.service_id  = s.id
-                  LEFT JOIN company_employees emp ON a.employee_id = emp.id';
+  if ($providerId) {
+    $where[] = 'a.provider_id = ?';
+    $params[] = $providerId;
+  }
 
-        if ($filters) {
-            $query .= ' WHERE ' . implode(' AND ', $filters);
-        }
+  if ($status) {
+    $where[] = 'a.status = ?';
+    $params[] = $status;
+  }
 
-        $query .= ' ORDER BY a.date DESC, a.start_time DESC';
+  if ($dateFrom) {
+    $where[] = 'a.date >= ?';
+    $params[] = $dateFrom;
+  }
 
-        $stmt = $db->prepare($query);
-        $stmt->execute($params);
-        $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  if ($dateTo) {
+    $where[] = 'a.date <= ?';
+    $params[] = $dateTo;
+  }
 
-        jsonResponse(true, $appointments);
-    }
+  $sql =
+    "SELECT
+       a.id,
+       a.date,
+       a.start_time,
+       a.end_time,
+       a.duration,
+       a.status,
+       a.company_id,
+       a.provider_id,
+       a.client_id,
+       a.employee_id,
+       a.service_id,
+       a.notes,
+       a.created_at,
+       a.updated_at,
+       c.name AS company_name,
+       p.name AS provider_name,
+       s.name AS service_name,
+       e.name AS employee_name
+     FROM appointments a
+     LEFT JOIN companies  c ON c.id = a.company_id
+     LEFT JOIN providers  p ON p.id = a.provider_id
+     LEFT JOIN services   s ON s.id = a.service_id
+     LEFT JOIN employees  e ON e.id = a.employee_id";
 
-    if ($method === 'POST') {
-        $date       = isset($payload['date']) ? trim($payload['date']) : '';
-        $startTime  = isset($payload['startTime']) ? trim($payload['startTime']) : '';
-        $endTime    = isset($payload['endTime']) ? trim($payload['endTime']) : '';
-        $duration   = isset($payload['duration']) ? (int)$payload['duration'] : null;
-        $companyId  = isset($payload['companyId']) ? trim((string)$payload['companyId']) : null;
-        $providerId = isset($payload['providerId']) ? trim((string)$payload['providerId']) : null;
-        $serviceId  = isset($payload['serviceId']) ? trim((string)$payload['serviceId']) : null;
-        $employeeId = isset($payload['employeeId']) ? trim((string)$payload['employeeId']) : null;
-        $clientId   = isset($payload['clientId']) ? trim((string)$payload['clientId']) : null;
-        $status     = isset($payload['status']) ? trim($payload['status']) : 'scheduled';
-        $notes      = isset($payload['notes']) ? trim($payload['notes']) : null;
+  if ($where) {
+    $sql .= " WHERE " . implode(' AND ', $where);
+  }
 
-        if ($date === '' || $startTime === '' || !$duration) {
-            jsonResponse(false, null, 422, 'Date, startTime and duration are required');
-        }
+  // Ordena por data e hora
+  $sql .= " ORDER BY a.date ASC, a.start_time ASC";
 
-        // Calcula endTime se não vier
-        if ($endTime === '' && $duration) {
-            $startParts   = explode(':', $startTime);
-            $minutesTotal = ((int)$startParts[0]) * 60 + ((int)$startParts[1]) + (int)$duration;
-            $endHour      = floor($minutesTotal / 60);
-            $endMinute    = $minutesTotal % 60;
-            $endTime      = str_pad((string)$endHour, 2, '0', STR_PAD_LEFT) . ':' . str_pad((string)$endMinute, 2, '0', STR_PAD_LEFT);
-        }
+  try {
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
 
-        $id = newId();
-        $stmt = $db->prepare('INSERT INTO appointments
-            (id, client_id, provider_id, company_id, employee_id, service_id, date, start_time, end_time, duration, status, notes, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())');
-        $stmt->execute([
-            $id,
-            $clientId,
-            $providerId,
-            $companyId,
-            $employeeId,
-            $serviceId,
-            $date,
-            $startTime,
-            $endTime,
-            $duration,
-            $status,
-            $notes
-        ]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $out = array_map('mapAppointmentRow', $rows);
 
-        jsonResponse(true, [
-            'id'         => $id,
-            'date'       => $date,
-            'startTime'  => $startTime,
-            'endTime'    => $endTime,
-            'duration'   => (int)$duration,
-            'status'     => $status,
-            'companyId'  => $companyId,
-            'providerId' => $providerId,
-            'serviceId'  => $serviceId,
-            'employeeId' => $employeeId,
-            'notes'      => $notes
-        ], 201);
-    }
-
-    jsonResponse(false, null, 405, 'Unsupported method');
-} catch (PDOException $exception) {
-    jsonResponse(false, null, 500, 'Database error: ' . $exception->getMessage());
+    jsonResponse(true, $out);
+  } catch (PDOException $e) {
+    jsonResponse(false, null, 500, 'Failed to fetch appointments: ' . $e->getMessage());
+  }
+  exit();
 }
+
+if ($method === 'POST') {
+  // Criar agendamento: apenas admin
+  $auth = requireAuth();
+  if (!in_array($auth['role'], ['admin'])) {
+    jsonResponse(false, null, 403, 'Forbidden');
+  }
+
+  $data = readBody();
+
+  $date       = isset($data['date']) ? trim($data['date']) : '';
+  $startTime  = isset($data['startTime']) ? trim($data['startTime']) : '';
+  $endTime    = isset($data['endTime']) ? trim($data['endTime']) : null;
+  $duration   = isset($data['duration']) ? (int)$data['duration'] : 0;
+  $status     = isset($data['status']) ? trim($data['status']) : 'scheduled';
+  $companyId  = isset($data['companyId']) ? trim($data['companyId']) : null;
+  $providerId = isset($data['providerId']) ? trim($data['providerId']) : null;
+  $clientId   = isset($data['clientId']) ? trim($data['clientId']) : null;
+  $employeeId = isset($data['employeeId']) ? trim($data['employeeId']) : null;
+  $serviceId  = isset($data['serviceId']) ? trim($data['serviceId']) : null;
+  $notes      = isset($data['notes']) ? trim($data['notes']) : null;
+
+  if ($date === '' || $startTime === '' || $duration <= 0) {
+    jsonResponse(false, null, 422, 'date, startTime and duration are required');
+  }
+
+  // Calcula endTime se não enviado
+  if ($endTime === null || $endTime === '') {
+    // $startTime = "HH:MM"
+    $parts = explode(':', $startTime);
+    $h = (int)$parts[0];
+    $m = (int)($parts[1] ?? 0);
+    $total = $h * 60 + $m + $duration;
+    $eh = floor($total / 60);
+    $em = $total % 60;
+    $endTime = sprintf('%02d:%02d', $eh, $em);
+  }
+
+  try {
+    $db->beginTransaction();
+
+    $id = newId();
+    $sql = "INSERT INTO appointments
+              (id, date, start_time, end_time, duration, status,
+               company_id, provider_id, client_id, employee_id, service_id, notes,
+               created_at, updated_at)
+            VALUES
+              (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+    $params = [
+      $id, $date, $startTime, $endTime, $duration, $status,
+      $companyId, $providerId, $clientId, $employeeId, $serviceId, $notes
+    ];
+
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+
+    $db->commit();
+
+    // Retorna o objeto criado (com os campos padrão)
+    $created = [
+      'id'          => $id,
+      'date'        => $date,
+      'start_time'  => $startTime,
+      'end_time'    => $endTime,
+      'duration'    => $duration,
+      'status'      => $status,
+      'company_id'  => $companyId,
+      'provider_id' => $providerId,
+      'client_id'   => $clientId,
+      'employee_id' => $employeeId,
+      'service_id'  => $serviceId,
+      'notes'       => $notes,
+      'created_at'  => date('Y-m-d H:i:s'),
+      'updated_at'  => date('Y-m-d H:i:s'),
+    ];
+
+    jsonResponse(true, $created, 201);
+  } catch (PDOException $e) {
+    if ($db->inTransaction()) $db->rollBack();
+    jsonResponse(false, null, 500, 'Failed to create appointment: ' . $e->getMessage());
+  }
+  exit();
+}
+
+// Outros métodos não permitidos aqui (PUT/PATCH/DELETE possuem seus próprios arquivos)
+jsonResponse(false, null, 405, 'Method not allowed');

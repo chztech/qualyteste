@@ -284,7 +284,7 @@ class ApiService {
     return response as ApiResponse<Company>;
   }
 
-  // ✅ MÉTODO CORRIGIDO (método 1)
+  // ✅ corrige envio (snake_case) e evita sobrescrever com undefined
   async updateCompany(
     id: string,
     payload: Partial<Company> & { password?: string }
@@ -313,7 +313,6 @@ class ApiService {
       employees: employeesBody,
     };
 
-    // remove chaves undefined para evitar sobrescrever no backend
     Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
 
     const response = await this.request<any>("/companies/update.php", {
@@ -324,7 +323,7 @@ class ApiService {
     return response as ApiResponse<{ id: string; employees?: Employee[] }>;
   }
 
-  // 🔑 Alterar senha da empresa (endpoint dedicado)
+  // 🔑 Alterar senha da empresa
   async changeCompanyPassword(companyId: string, password: string) {
     return this.request<{ message: string }>("/companies/password.php", {
       method: "PUT",
@@ -487,6 +486,7 @@ class ApiService {
     return response as ApiResponse<Appointment[]>;
   }
 
+  // ✅ envia snake_case para alinhar com o PHP
   async createAppointment(payload: {
     date: string;
     startTime: string;
@@ -500,29 +500,141 @@ class ApiService {
     serviceId?: string | null;
     notes?: string | null;
   }) {
+    const body: any = {
+      date: payload.date,
+      start_time: payload.startTime,
+      end_time: payload.endTime,
+      duration: payload.duration,
+      status: payload.status,
+      company_id: payload.companyId,
+      provider_id: payload.providerId,
+      client_id: payload.clientId,
+      employee_id: payload.employeeId,
+      service_id: payload.serviceId,
+      notes: payload.notes,
+    };
+    Object.keys(body).forEach((k) => body[k] === undefined && delete body[k]);
+
     const response = await this.request<any>("/appointments/index.php", {
       method: "POST",
-      body: payload,
+      body,
     });
 
     if (response.success && response.data) {
+      // junta o que foi enviado + dados de retorno (ex.: id)
       return {
         ...response,
-        data: this.mapAppointment({ ...payload, ...response.data }),
+        data: this.mapAppointment({ ...body, ...response.data }),
       } as ApiResponse<Appointment>;
     }
 
     return response as ApiResponse<Appointment>;
   }
 
+  // ✅ converte somente campos presentes para snake_case
   async updateAppointment(id: string, payload: Partial<Appointment>) {
-    return this.request<{ id: string }>("/appointments/update.php", {
-      method: "POST",
-      body: {
-        id,
-        ...payload,
-      },
-    });
+    const body: Record<string, any> = { id };
+
+    if (payload.date !== undefined) body.date = payload.date;
+    if (payload.startTime !== undefined) body.start_time = payload.startTime;
+    if (payload.endTime !== undefined) body.end_time = payload.endTime;
+    if (payload.duration !== undefined) body.duration = payload.duration;
+    if (payload.status !== undefined) body.status = payload.status;
+    if (payload.companyId !== undefined) body.company_id = payload.companyId;
+    if (payload.providerId !== undefined) body.provider_id = payload.providerId;
+    if (payload.clientId !== undefined) body.client_id = payload.clientId;
+    if (payload.employeeId !== undefined) body.employee_id = payload.employeeId;
+    if (payload.serviceId !== undefined) body.service_id = payload.serviceId;
+    if (payload.notes !== undefined) body.notes = payload.notes;
+
+    const response = await this.request<{ id: string }>(
+      "/appointments/update.php",
+      {
+        method: "POST",
+        body,
+      }
+    );
+
+    return response;
+  }
+
+  async confirmPublicAppointment(payload: {
+    appointmentId: string;
+    companyToken: string;
+    employeeId?: string | null;
+    notes?: string | null;
+  }) {
+    const body: Record<string, any> = {
+      appointmentId: payload.appointmentId,
+      companyToken: payload.companyToken,
+    };
+
+    if (payload.employeeId !== undefined) {
+      body.employeeId = payload.employeeId;
+    }
+
+    if (payload.notes !== undefined) {
+      body.notes = payload.notes;
+    }
+
+    const response = await this.request<any>(
+      "/appointments/public-confirm.php",
+      {
+        method: "POST",
+        body,
+      }
+    );
+
+    if (response.success && response.data) {
+      return {
+        ...response,
+        data: this.mapAppointment(response.data),
+      } as ApiResponse<Appointment>;
+    }
+
+    return response as ApiResponse<Appointment>;
+  }
+
+  async publicAddEmployee(payload: {
+    companyToken: string;
+    employeeId?: string;
+    name: string;
+    phone?: string | null;
+    department?: string | null;
+  }) {
+    const body: Record<string, any> = {
+      companyToken: payload.companyToken,
+      name: payload.name,
+    };
+
+    if (payload.employeeId) {
+      body.employeeId = payload.employeeId;
+    }
+
+    if (payload.phone !== undefined) {
+      body.phone = payload.phone;
+    }
+
+    if (payload.department !== undefined) {
+      body.department = payload.department;
+    }
+
+    const response = await this.request<any>(
+      "/companies/public-add-employee.php",
+      {
+        method: "POST",
+        body,
+      }
+    );
+
+    if (response.success && response.data) {
+      return {
+        ...response,
+        data: this.mapEmployee(response.data),
+      } as ApiResponse<Employee>;
+    }
+
+    return response as ApiResponse<Employee>;
   }
 
   async deleteAppointments(ids: string[]) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Header from "./components/Layout/Header";
 import Sidebar from "./components/Layout/Sidebar";
 import CalendarHeader from "./components/Calendar/CalendarHeader";
@@ -29,6 +29,14 @@ import {
   Service,
 } from "./types";
 import { Building2 } from "lucide-react";
+
+// util: string YYYY-MM-DD da data atual (timezone-safe)
+const toYMD = (d: Date) => {
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, "0");
+  const dd = `${d.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
 
 function App() {
   // Authentication state
@@ -81,25 +89,36 @@ function App() {
             : Promise.resolve({ success: true, data: [] }),
         ]);
 
-        setCompanies(
-          companiesRes.success && companiesRes.data ? companiesRes.data : []
-        );
-        setProviders(
-          providersRes.success && providersRes.data ? providersRes.data : []
-        );
-        setServices(
-          servicesRes.success && servicesRes.data ? servicesRes.data : []
-        );
-        setAppointments(
-          appointmentsRes.success && appointmentsRes.data
-            ? appointmentsRes.data
-            : []
-        );
+        if (companiesRes.success && companiesRes.data) {
+          setCompanies(companiesRes.data);
+        } else {
+          setCompanies([]);
+        }
+
+        if (providersRes.success && providersRes.data) {
+          setProviders(providersRes.data);
+        } else {
+          setProviders([]);
+        }
+
+        if (servicesRes.success && servicesRes.data) {
+          setServices(servicesRes.data);
+        } else {
+          setServices([]);
+        }
+
+        if (appointmentsRes.success && appointmentsRes.data) {
+          setAppointments(appointmentsRes.data);
+        } else {
+          setAppointments([]);
+        }
 
         if (effectiveRole === "admin") {
-          setUsers(
-            usersRes.success && usersRes.data ? (usersRes.data as User[]) : []
-          );
+          if (usersRes.success && usersRes.data) {
+            setUsers(usersRes.data as User[]);
+          } else {
+            setUsers([]);
+          }
         } else {
           setUsers([]);
         }
@@ -113,7 +132,7 @@ function App() {
     [currentUser?.role]
   );
 
-  // Simplified time slots
+  // System settings - Simplified time slots
   const [availableTimeSlots] = useState(() => {
     const slots: string[] = [];
     for (let hour = 6; hour < 24; hour++) {
@@ -136,61 +155,94 @@ function App() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  // Utility functions
   const calculateEndTime = (startTime: string, duration: number) => {
     const [hours, minutes] = startTime.split(":").map(Number);
     const startMinutes = hours * 60 + minutes;
     const endMinutes = startMinutes + duration;
     const endHours = Math.floor(endMinutes / 60);
     const remainingMinutes = endMinutes % 60;
+
     return `${endHours.toString().padStart(2, "0")}:${remainingMinutes
       .toString()
       .padStart(2, "0")}`;
   };
 
-  // Public booking helpers
-  const isPublicBookingPage = () => {
+  // 🎯 Identificar página pública
+  const isPublicBookingPage = React.useCallback(() => {
     try {
       const path = window.location.pathname;
       const isBookingRoute =
         path.startsWith("/agendamento/") &&
         path.length > "/agendamento/".length;
-      if (isBookingRoute) {
-        const token = path.split("/agendamento/")[1];
-        try {
-          const decoded = atob(token);
-          return decoded && decoded.length > 0 && !decoded.includes(" ");
-        } catch {
-          return false;
-        }
+      if (!isBookingRoute) return false;
+
+      // valida token
+      const token = path.split("/agendamento/")[1];
+      try {
+        const decoded = atob(token);
+        const isValidToken =
+          decoded && decoded.length > 0 && !decoded.includes(" ");
+        return isValidToken;
+      } catch {
+        return false;
       }
-      return false;
-    } catch {
+    } catch (error) {
+      console.error("Erro ao verificar página pública:", error);
       return false;
     }
-  };
+  }, []);
 
-  const getBookingToken = () => {
+  // 🎯 Obter token da URL
+  const getBookingToken = React.useCallback(() => {
     try {
       const path = window.location.pathname;
-      return path.split("/agendamento/")[1] || null;
-    } catch {
+      const token = path.split("/agendamento/")[1];
+      return token;
+    } catch (error) {
+      console.error("Erro ao extrair token:", error);
       return null;
     }
-  };
+  }, []);
 
-  // 🔄 Carrega dados automaticamente quando for rota pública
+  // 🔄 Carregar dados públicos sem exigir login (GETs)
   useEffect(() => {
-    if (isPublicBookingPage()) {
-      loadInitialData();
-    }
-  }, [loadInitialData]);
+    const run = async () => {
+      if (isPublicBookingPage()) {
+        try {
+          const [companiesRes, providersRes, servicesRes, appointmentsRes] =
+            await Promise.all([
+              apiService.getCompanies(),
+              apiService.getProviders(),
+              apiService.getServices(),
+              apiService.getAppointments(),
+            ]);
 
-  // Employees (company)
+          setCompanies(companiesRes.success ? companiesRes.data ?? [] : []);
+          setProviders(providersRes.success ? providersRes.data ?? [] : []);
+          setServices(servicesRes.success ? servicesRes.data ?? [] : []);
+          setAppointments(
+            appointmentsRes.success ? appointmentsRes.data ?? [] : []
+          );
+        } catch (e) {
+          console.error("Falha ao carregar dados públicos:", e);
+        }
+      }
+    };
+    run();
+  }, [isPublicBookingPage]);
+
+  // Employee management functions for companies
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find((c) => c.id === employeeData.companyId);
+    const company = companies.find(
+      (item) => item.id === employeeData.companyId
+    );
     if (!company) return;
 
-    const newEmployee: Employee = { ...employeeData, id: generateId() };
+    const newEmployee: Employee = {
+      ...employeeData,
+      id: generateId(),
+    };
 
     try {
       await apiService.updateCompany(employeeData.companyId, {
@@ -207,11 +259,13 @@ function App() {
     id: string,
     employeeData: Partial<Employee>
   ) => {
-    const company = companies.find((c) => c.employees.some((e) => e.id === id));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
     if (!company) return;
 
-    const updatedEmployees = company.employees.map((e) =>
-      e.id === id ? { ...e, ...employeeData } : e
+    const updatedEmployees = company.employees.map((employee) =>
+      employee.id === id ? { ...employee, ...employeeData } : employee
     );
 
     try {
@@ -226,12 +280,18 @@ function App() {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este colaborador?")) return;
+    if (!confirm("Tem certeza que deseja excluir este colaborador?")) {
+      return;
+    }
 
-    const company = companies.find((c) => c.employees.some((e) => e.id === id));
+    const company = companies.find((item) =>
+      item.employees.some((employee) => employee.id === id)
+    );
     if (!company) return;
 
-    const updatedEmployees = company.employees.filter((e) => e.id !== id);
+    const updatedEmployees = company.employees.filter(
+      (employee) => employee.id !== id
+    );
 
     try {
       await apiService.updateCompany(company.id, {
@@ -244,12 +304,14 @@ function App() {
     }
   };
 
-  // Auth
+  // 🔑 Login
   const handleLogin = async (email: string, password: string) => {
     try {
       const response = await apiService.login(email, password);
+
       if (response.success && response.data) {
         const { user, token } = response.data;
+
         apiService.setAuthToken(token);
         await loadInitialData(user.role);
 
@@ -265,12 +327,17 @@ function App() {
         setCurrentUser(mappedUser);
         setIsAuthenticated(true);
 
-        if (mappedUser.role === "company") setActiveTab("dashboard");
-        else if (mappedUser.role === "provider") setActiveTab("my-schedule");
-        else setActiveTab("calendar");
+        if (mappedUser.role === "company") {
+          setActiveTab("dashboard");
+        } else if (mappedUser.role === "provider") {
+          setActiveTab("my-schedule");
+        } else {
+          setActiveTab("calendar");
+        }
 
         return { success: true as const };
       }
+
       const message = response.error || "Falha no login";
       return { success: false as const, message };
     } catch (error) {
@@ -300,22 +367,20 @@ function App() {
     setViewMode("day");
   };
 
-  const handleCompanyClick = (
-    company: Company,
-    date: string,
-    time?: string
-  ) => {
+  // 🎯 Novo: clique da empresa no calendário (tooltip simples)
+  const handleCompanyClick = (company: Company, ymd: string, time?: string) => {
     const companyAppointments = appointments.filter(
       (apt) =>
         apt.companyId === company.id &&
-        apt.date === date &&
+        apt.date === ymd &&
         (!time || apt.startTime === time)
     );
+
     if (companyAppointments.length > 0) {
       alert(
-        `🏢 ${company.name}\n📅 ${new Date(date).toLocaleDateString(
-          "pt-BR"
-        )}\n${time ? `🕐 ${time}\n` : ""}\n📊 ${
+        `🏢 ${company.name}\n📅 ${new Date(
+          ymd + "T12:00:00"
+        ).toLocaleDateString("pt-BR")}\n${time ? `🕐 ${time}\n` : ""}\n📊 ${
           companyAppointments.length
         } agendamento(s)\n\n${companyAppointments
           .map(
@@ -362,6 +427,7 @@ function App() {
           notes: appointmentData.notes ?? null,
         });
       }
+
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao salvar agendamento:", error);
@@ -396,6 +462,7 @@ function App() {
     }
   };
 
+  // Atualizar múltiplos agendamentos
   const handleUpdateMultipleAppointments = async (
     appointmentIds: string[],
     updateData: Partial<Appointment>
@@ -411,8 +478,10 @@ function App() {
     }
   };
 
+  // Excluir múltiplos agendamentos
   const handleDeleteMultipleAppointments = async (appointmentIds: string[]) => {
     if (appointmentIds.length === 0) return;
+
     try {
       await apiService.deleteAppointments(appointmentIds);
       await loadInitialData();
@@ -424,6 +493,7 @@ function App() {
 
   const handleAdminSchedulingSubmit = async (scheduleData: any) => {
     const { companyId, date, slots, chairs } = scheduleData;
+
     try {
       await Promise.all(
         slots.map(async (slot: any) => {
@@ -437,7 +507,7 @@ function App() {
             companyId,
             providerId: slot.providerId,
             serviceId: slot.serviceId,
-            clientId: null,
+            clientId: companyId,
             employeeId: null,
             date,
             startTime: slot.time,
@@ -458,6 +528,7 @@ function App() {
     }
   };
 
+  // Company booking (empresa aloca colaborador)
   const handleCompanyBookAppointment = async (
     appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -465,7 +536,8 @@ function App() {
       const existingSlot = appointments.find((apt) => {
         const sameService = appointmentData.serviceId
           ? apt.serviceId === appointmentData.serviceId
-          : apt.service === (appointmentData as any).service;
+          : apt.service === appointmentData.service;
+
         return (
           apt.companyId === appointmentData.companyId &&
           apt.date === appointmentData.date &&
@@ -496,6 +568,7 @@ function App() {
           notes: appointmentData.notes,
         });
       }
+
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao registrar agendamento da empresa:", error);
@@ -503,59 +576,103 @@ function App() {
     }
   };
 
+  // Public booking (confirmar slot existente)
   const handlePublicBookAppointment = async (appointmentData: {
     id: string;
     employeeId?: string;
     notes?: string;
   }) => {
+    const bookingToken = getBookingToken();
+    if (!bookingToken) {
+      alert("Link de agendamento invalido.");
+      return;
+    }
+
     try {
-      await apiService.updateAppointment(appointmentData.id, {
+      const response = await apiService.confirmPublicAppointment({
+        appointmentId: appointmentData.id,
+        companyToken: bookingToken,
         employeeId: appointmentData.employeeId ?? null,
         notes: appointmentData.notes,
-        status: "confirmed",
       });
-      await loadInitialData();
+
+      if (!response.success) {
+        throw new Error(response.error || "Falha ao confirmar agendamento.");
+      }
+
+      await loadInitialData(currentUser?.role);
+
       alert(
-        "✅ Agendamento realizado com sucesso!\n\nSeu horário foi confirmado."
+        "Agendamento realizado com sucesso!\\n\\nSeu horario foi confirmado. Em caso de duvidas, entre em contato com a empresa."
       );
     } catch (error) {
-      console.error("Erro ao confirmar agendamento público:", error);
-      alert("Não foi possível confirmar o agendamento. Tente novamente.");
+      console.error("Erro ao confirmar agendamento publico:", error);
+      alert("Nao foi possivel confirmar o agendamento. Tente novamente.");
     }
   };
 
-  const handleAddEmployeeFromPublic = (employeeData: Omit<Employee, "id">) => {
-    const company = companies.find((c) => c.id === employeeData.companyId);
-    if (!company) {
-      alert("Empresa não encontrada para associar o colaborador.");
+
+  // Add employee publico
+  const handleAddEmployeeFromPublic = async (
+    employeeData: Omit<Employee, "id">
+  ) => {
+    const bookingToken = getBookingToken();
+    if (!bookingToken) {
+      alert("Link de agendamento invalido.");
       return "";
     }
 
-    const newEmployee: Employee = { ...employeeData, id: generateId() };
+    const newEmployeeId = generateId();
 
-    setCompanies((prev) =>
-      prev.map((item) =>
-        item.id === company.id
-          ? { ...item, employees: [...item.employees, newEmployee] }
-          : item
-      )
-    );
-
-    apiService
-      .updateCompany(company.id, {
-        employees: [...company.employees, newEmployee],
-      })
-      .then(() => loadInitialData(currentUser?.role))
-      .catch((error) => {
-        console.error("Erro ao adicionar colaborador público:", error);
-        alert("Não foi possível adicionar o colaborador. Tente novamente.");
-        loadInitialData(currentUser?.role);
+    try {
+      const response = await apiService.publicAddEmployee({
+        companyToken: bookingToken,
+        employeeId: newEmployeeId,
+        name: employeeData.name,
+        phone: employeeData.phone ?? null,
+        department: employeeData.department ?? null,
       });
 
-    return newEmployee.id;
+      if (!response.success) {
+        throw new Error(response.error || "Falha ao salvar colaborador.");
+      }
+
+      const employee: Employee =
+        response.data ?? {
+          id: newEmployeeId,
+          companyId: employeeData.companyId,
+          name: employeeData.name,
+          phone: employeeData.phone ?? null,
+          department: employeeData.department ?? null,
+        };
+
+      setCompanies((prev) =>
+        prev.map((item) =>
+          item.id === employee.companyId
+            ? {
+                ...item,
+                employees: item.employees.some((emp) => emp.id === employee.id)
+                  ? item.employees.map((emp) =>
+                      emp.id === employee.id ? employee : emp
+                    )
+                  : [...item.employees, employee],
+              }
+            : item
+        )
+      );
+
+      await loadInitialData(currentUser?.role);
+
+      return employee.id;
+    } catch (error) {
+      console.error("Erro ao adicionar colaborador publico:", error);
+      alert("Nao foi possivel adicionar o colaborador. Tente novamente.");
+      await loadInitialData(currentUser?.role);
+      return "";
+    }
   };
 
-  // Providers
+  // Provider management functions
   const handleAddProvider = async (providerData: Omit<Provider, "id">) => {
     try {
       await apiService.createProvider({
@@ -588,7 +705,10 @@ function App() {
   };
 
   const handleDeleteProvider = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este prestador?")) return;
+    if (!confirm("Tem certeza que deseja excluir este prestador?")) {
+      return;
+    }
+
     try {
       await apiService.updateProvider(id, { isActive: false });
       await loadInitialData();
@@ -598,26 +718,23 @@ function App() {
     }
   };
 
-  /** alterar senha do prestador */
+  // ✅ Alterar senha do prestador (faltava no App)
   const handleChangeProviderPassword = async (
     providerId: string,
     password: string
   ) => {
     try {
-      const res = await apiService.changeProviderPassword({
-        providerId,
-        password,
-      });
+      const res = await apiService.updateProviderPassword(providerId, password);
       if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
       alert("Senha do prestador alterada com sucesso!");
       await loadInitialData(currentUser?.role);
-    } catch (err) {
-      console.error("Erro ao alterar senha do prestador:", err);
+    } catch (error) {
+      console.error("Erro ao alterar senha do prestador:", error);
       alert("Não foi possível alterar a senha do prestador. Tente novamente.");
     }
   };
 
-  // Companies
+  // Company management functions
   const handleAddCompany = async (
     companyData: Omit<Company, "id">,
     options?: { password?: string }
@@ -674,7 +791,10 @@ function App() {
   };
 
   const handleDeleteCompany = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta empresa?")) return;
+    if (!confirm("Tem certeza que deseja excluir esta empresa?")) {
+      return;
+    }
+
     try {
       await apiService.updateCompany(id, { isActive: false });
       await loadInitialData();
@@ -700,7 +820,7 @@ function App() {
     }
   };
 
-  // Services
+  // Service management functions
   const handleAddService = async (
     serviceData: Omit<Service, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -732,7 +852,10 @@ function App() {
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este serviço?")) return;
+    if (!confirm("Tem certeza que deseja excluir este serviço?")) {
+      return;
+    }
+
     try {
       await apiService.deleteService(id);
       await loadInitialData();
@@ -777,7 +900,10 @@ function App() {
   };
 
   const handleDeleteAdmin = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este administrador?")) return;
+    if (!confirm("Tem certeza que deseja excluir este administrador?")) {
+      return;
+    }
+
     try {
       await apiService.updateUser(id, { isActive: false });
       await loadInitialData();
@@ -797,9 +923,15 @@ function App() {
   };
 
   const getFilteredData = () => {
-    if (!currentUser) return { appointments: [], companies: [], employees: [] };
+    if (!currentUser)
+      return {
+        appointments: [] as Appointment[],
+        companies: [] as Company[],
+        employees: [] as Employee[],
+      };
+
     switch (currentUser.role) {
-      case "company": {
+      case "company":
         const userCompany = companies.find(
           (c) => c.id === currentUser.companyId
         );
@@ -810,7 +942,6 @@ function App() {
           companies: userCompany ? [userCompany] : [],
           employees: userCompany ? userCompany.employees : [],
         };
-      }
       case "provider":
         return {
           appointments: appointments.filter(
@@ -830,8 +961,10 @@ function App() {
 
   const renderMainContent = () => {
     if (!currentUser) return null;
+
     const filteredData = getFilteredData();
 
+    // Company Dashboard
     if (currentUser.role === "company") {
       const userCompany = companies.find((c) => c.id === currentUser.companyId);
       if (!userCompany) return <div>Empresa não encontrada</div>;
@@ -854,6 +987,7 @@ function App() {
       );
     }
 
+    // Provider Dashboard
     if (currentUser.role === "provider" && activeTab === "my-schedule") {
       const provider = providers.find((p) => p.id === currentUser.id);
       if (!provider) return <div>Prestador não encontrado</div>;
@@ -869,6 +1003,7 @@ function App() {
       );
     }
 
+    // Admin views
     switch (activeTab) {
       case "calendar":
         return (
@@ -948,7 +1083,7 @@ function App() {
           />
         );
 
-      case "admins": {
+      case "admins":
         const adminUsers = users.filter((user) => user.role === "admin");
         return (
           <AdminManagement
@@ -956,10 +1091,9 @@ function App() {
             onAddAdmin={handleAddAdmin}
             onUpdateAdmin={handleUpdateAdmin}
             onDeleteAdmin={handleDeleteAdmin}
-            currentUserId={currentUser!.id}
+            currentUserId={currentUser.id}
           />
         );
-      }
 
       case "reports":
         return (
@@ -996,27 +1130,31 @@ function App() {
     }
   };
 
-  // ✅ Early return da página pública ANTES do check de autenticação
+  // 🔓 Página pública SEM exigir login
   if (isPublicBookingPage()) {
     const token = getBookingToken();
-    return (
-      <PublicBooking
-        companyToken={token!}
-        companies={companies}
-        providers={providers}
-        services={services}
-        availableTimeSlots={availableTimeSlots}
-        appointments={appointments}
-        onBookAppointment={handlePublicBookAppointment}
-        onAddEmployee={handleAddEmployeeFromPublic}
-      />
-    );
+    if (token) {
+      return (
+        <PublicBooking
+          companyToken={token}
+          companies={companies}
+          providers={providers}
+          services={services}
+          availableTimeSlots={availableTimeSlots}
+          appointments={appointments}
+          onBookAppointment={handlePublicBookAppointment}
+          onAddEmployee={handleAddEmployeeFromPublic}
+        />
+      );
+    }
   }
 
+  // Tela de login se não autenticado
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
   }
 
+  // App autenticado
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
