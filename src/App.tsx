@@ -611,7 +611,6 @@ function App() {
     }
   };
 
-
   // Add employee publico
   const handleAddEmployeeFromPublic = async (
     employeeData: Omit<Employee, "id">
@@ -637,14 +636,13 @@ function App() {
         throw new Error(response.error || "Falha ao salvar colaborador.");
       }
 
-      const employee: Employee =
-        response.data ?? {
-          id: newEmployeeId,
-          companyId: employeeData.companyId,
-          name: employeeData.name,
-          phone: employeeData.phone ?? null,
-          department: employeeData.department ?? null,
-        };
+      const employee: Employee = response.data ?? {
+        id: newEmployeeId,
+        companyId: employeeData.companyId,
+        name: employeeData.name,
+        phone: employeeData.phone ?? null,
+        department: employeeData.department ?? null,
+      };
 
       setCompanies((prev) =>
         prev.map((item) =>

@@ -633,7 +633,7 @@ export default function PublicBooking({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {availableDates.map((dateInfo) => (
+                {getAvailableDates().map((dateInfo) => (
                   <button
                     key={dateInfo.date}
                     onClick={() => setSelectedDate(dateInfo.date)}
@@ -660,7 +660,6 @@ export default function PublicBooking({
                         {dateInfo.totalSlots > 1 ? "s" : ""} disponível
                         {dateInfo.totalSlots > 1 ? "is" : ""}
                       </div>
-
                       <div className="space-y-1">
                         {dateInfo.shifts.morning > 0 && (
                           <div className="flex items-center space-x-1">
