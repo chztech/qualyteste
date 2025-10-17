@@ -32,7 +32,9 @@ interface PublicBookingProps {
     employeeId?: string;
     notes?: string;
   }) => void | Promise<void>;
-  onAddEmployee: (employeeData: Omit<Employee, "id">) => string | Promise<string>;
+  onAddEmployee: (
+    employeeData: Omit<Employee, "id">
+  ) => string | Promise<string>;
 }
 
 interface AvailableSlot {
