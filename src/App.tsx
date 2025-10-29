@@ -529,52 +529,46 @@ function App() {
   };
 
   // Company booking (empresa aloca colaborador)
-  const handleCompanyBookAppointment = async (
-    appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
-  ) => {
-    try {
-      const existingSlot = appointments.find((apt) => {
-        const sameService = appointmentData.serviceId
-          ? apt.serviceId === appointmentData.serviceId
-          : apt.service === appointmentData.service;
+  // 🔧 CORRIGIDO: Company booking: empresa aloca colaborador
+const handleCompanyBookAppointment = async (
+  appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
+) => {
+  console.log('📤 Criando agendamento individual:', appointmentData);
+  
+  try {
+    // Validações básicas
+    if (!appointmentData.companyId) throw new Error('Company ID é obrigatório');
+    if (!appointmentData.providerId) throw new Error('Provider ID é obrigatório');
+    if (!appointmentData.serviceId) throw new Error('Service ID é obrigatório');
+    if (!appointmentData.date) throw new Error('Data é obrigatória');
+    if (!appointmentData.startTime) throw new Error('Horário é obrigatório');
+    
+    // Criar agendamento
+    const response = await apiService.createAppointment({
+      companyId: appointmentData.companyId,
+      providerId: appointmentData.providerId,
+      clientId: appointmentData.clientId || appointmentData.companyId,
+      employeeId: appointmentData.employeeId || null,
+      serviceId: appointmentData.serviceId,
+      date: appointmentData.date,
+      startTime: appointmentData.startTime,
+      endTime: appointmentData.endTime,
+      duration: appointmentData.duration,
+      status: appointmentData.status || 'scheduled',
+      notes: appointmentData.notes || null,
+    });
+    
+    console.log('✅ Agendamento criado:', response);
+    
+    // ✅ RETORNA OBJETO PARA O LOOP VERIFICAR
+    return { success: true, data: response };
+    
+  } catch (error: any) {
+    console.error('❌ Erro ao criar agendamento:', error);
+    return { success: false, error: error.message || 'Erro desconhecido' };
+  }
+};
 
-        return (
-          apt.companyId === appointmentData.companyId &&
-          apt.date === appointmentData.date &&
-          apt.startTime === appointmentData.startTime &&
-          sameService &&
-          (!apt.employeeId || apt.employeeId === "")
-        );
-      });
-
-      if (existingSlot) {
-        await apiService.updateAppointment(existingSlot.id, {
-          employeeId: appointmentData.employeeId ?? null,
-          notes: appointmentData.notes,
-          status: appointmentData.status,
-        });
-      } else {
-        await apiService.createAppointment({
-          companyId: appointmentData.companyId,
-          providerId: appointmentData.providerId,
-          clientId: appointmentData.clientId,
-          employeeId: appointmentData.employeeId ?? null,
-          serviceId: appointmentData.serviceId,
-          date: appointmentData.date,
-          startTime: appointmentData.startTime,
-          endTime: appointmentData.endTime,
-          duration: appointmentData.duration,
-          status: appointmentData.status,
-          notes: appointmentData.notes,
-        });
-      }
-
-      await loadInitialData();
-    } catch (error) {
-      console.error("Erro ao registrar agendamento da empresa:", error);
-      alert("Não foi possível registrar o agendamento. Tente novamente.");
-    }
-  };
 
   // Public booking (confirmar slot existente)
   const handlePublicBookAppointment = async (appointmentData: {
@@ -611,6 +605,7 @@ function App() {
     }
   };
 
+
   // Add employee publico
   const handleAddEmployeeFromPublic = async (
     employeeData: Omit<Employee, "id">
@@ -636,13 +631,14 @@ function App() {
         throw new Error(response.error || "Falha ao salvar colaborador.");
       }
 
-      const employee: Employee = response.data ?? {
-        id: newEmployeeId,
-        companyId: employeeData.companyId,
-        name: employeeData.name,
-        phone: employeeData.phone ?? null,
-        department: employeeData.department ?? null,
-      };
+      const employee: Employee =
+        response.data ?? {
+          id: newEmployeeId,
+          companyId: employeeData.companyId,
+          name: employeeData.name,
+          phone: employeeData.phone ?? null,
+          department: employeeData.department ?? null,
+        };
 
       setCompanies((prev) =>
         prev.map((item) =>
