@@ -19,7 +19,7 @@ export default function AdminCompanyScheduling({
   companies,
   providers,
   services,
-  availableTimeSlots
+  availableTimeSlots,
 }: AdminCompanySchedulingProps) {
   // Dados do formulário - TUDO EM UMA TELA
   const [formData, setFormData] = useState({
@@ -37,10 +37,11 @@ export default function AdminCompanyScheduling({
       endTime: string;
       type: 'lunch' | 'coffee' | 'meeting' | 'rest' | 'custom';
     }>,
-    selectedProviders: [] as string[]
+    selectedProviders: [] as string[],
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
 
   const timeToMinutes = (time: string): number => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -68,23 +69,22 @@ export default function AdminCompanyScheduling({
       for (const breakItem of formData.breaks) {
         const breakStartMinutes = timeToMinutes(breakItem.startTime);
         const breakEndMinutes = timeToMinutes(breakItem.endTime);
-        
-        if (minutes < breakEndMinutes && slotEndMinutes > breakStartMinutes) {
+
+        if (!(minutes >= breakEndMinutes || slotEndMinutes <= breakStartMinutes)) {
           hasConflict = true;
           break;
         }
       }
-      
-      if (hasConflict) continue;
 
-      if (slotEndMinutes <= endMinutes) {
-        slots.push({
-          time: slotTime,
-          endTime: minutesToTime(slotEndMinutes),
-          duration: formData.duration,
-          service: formData.service
-        });
-      }
+      if (hasConflict) continue;
+      if (slotEndMinutes > endMinutes) continue;
+
+      slots.push({
+        time: slotTime,
+        endTime: minutesToTime(slotEndMinutes),
+        duration: formData.duration,
+        service: formData.service,
+      });
     }
 
     return slots;
@@ -97,73 +97,82 @@ export default function AdminCompanyScheduling({
       coffee: { name: 'Lanche', startTime: '15:00', endTime: '15:15' },
       meeting: { name: 'Reunião', startTime: '14:00', endTime: '14:30' },
       rest: { name: 'Descanso', startTime: '10:00', endTime: '10:15' },
-      custom: { name: 'Pausa Personalizada', startTime: '16:00', endTime: '16:30' }
+      custom: { name: 'Pausa Personalizada', startTime: '16:00', endTime: '16:30' },
     };
 
     const newBreak = {
       id: Date.now().toString(),
       type,
-      ...breakDefaults[type]
+      ...breakDefaults[type],
     };
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      breaks: [...prev.breaks, newBreak]
+      breaks: [...prev.breaks, newBreak],
     }));
   };
 
   // Remover pausa
   const removeBreak = (breakId: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      breaks: prev.breaks.filter(b => b.id !== breakId)
+      breaks: prev.breaks.filter((b) => b.id !== breakId),
     }));
   };
 
   // Atualizar pausa
   const updateBreak = (breakId: string, field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      breaks: prev.breaks.map(b => 
-        b.id === breakId ? { ...b, [field]: value } : b
-      )
+      breaks: prev.breaks.map((b) => (b.id === breakId ? { ...b, [field]: value } : b)),
     }));
   };
 
   // Obter ícone da pausa
   const getBreakIcon = (type: string) => {
     switch (type) {
-      case 'lunch': return '🍽️';
-      case 'coffee': return '☕';
-      case 'meeting': return '👥';
-      case 'rest': return '😴';
-      default: return '⏸️';
+      case 'lunch':
+        return '🍽️';
+      case 'coffee':
+        return '☕';
+      case 'meeting':
+        return '📋';
+      case 'rest':
+        return '💤';
+      default:
+        return '⏸️';
     }
   };
 
   // Obter cor da pausa
   const getBreakColor = (type: string) => {
     switch (type) {
-      case 'lunch': return 'bg-orange-50 border-orange-200 text-orange-800';
-      case 'coffee': return 'bg-yellow-50 border-yellow-200 text-yellow-800';
-      case 'meeting': return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'rest': return 'bg-purple-50 border-purple-200 text-purple-800';
-      default: return 'bg-gray-50 border-gray-200 text-gray-800';
+      case 'lunch':
+        return 'bg-orange-50 border-orange-200 text-orange-800';
+      case 'coffee':
+        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+      case 'meeting':
+        return 'bg-blue-50 border-blue-200 text-blue-800';
+      case 'rest':
+        return 'bg-purple-50 border-purple-200 text-purple-800';
+      default:
+        return 'bg-gray-50 border-gray-200 text-gray-800';
     }
   };
 
   const handleProviderToggle = (providerId: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       selectedProviders: prev.selectedProviders.includes(providerId)
-        ? prev.selectedProviders.filter(id => id !== providerId)
-        : [...prev.selectedProviders, providerId]
+        ? prev.selectedProviders.filter((id) => id !== providerId)
+        : [...prev.selectedProviders, providerId],
     }));
   };
 
-  const handleSubmit = () => {
+  // 🔧 FUNÇÃO CORRIGIDA: Criar agendamentos um por vez
+  const handleSubmit = async () => {
     if (!formData.companyId || !formData.date || formData.selectedProviders.length === 0) {
-      alert('❌ Preencha empresa, data e selecione pelo menos um prestador');
+      alert('Preencha empresa, data e selecione pelo menos um prestador');
       return;
     }
 
@@ -172,67 +181,85 @@ export default function AdminCompanyScheduling({
     try {
       const slots = generateSlots();
       console.log('🔍 Slots gerados:', slots);
-      
+
       if (slots.length === 0) {
-        alert('❌ Nenhum horário foi gerado. Verifique o período e as pausas configuradas.');
+        alert('Nenhum horário foi gerado. Verifique o período e as pausas configuradas.');
         setIsSubmitting(false);
         return;
       }
 
+      // Criar lista de todos os agendamentos
       const allAppointments: any[] = [];
-
       slots.forEach((slot, slotIndex) => {
         for (let chair = 1; chair <= formData.chairs; chair++) {
-          const providerIndex = (slotIndex * formData.chairs + chair - 1) % formData.selectedProviders.length;
+          const providerIndex = ((slotIndex * formData.chairs) + (chair - 1)) % formData.selectedProviders.length;
           const assignedProvider = formData.selectedProviders[providerIndex];
 
           allAppointments.push({
+            companyId: formData.companyId,
+            providerId: assignedProvider,
+            serviceId: services.find(s => s.name === formData.service)?.id || services[0]?.id,
             date: formData.date,
-            time: slot.time,
+            startTime: slot.time,
             endTime: slot.endTime,
             duration: slot.duration,
-            serviceId: services.find(s => s.name === formData.service)?.id || services[0]?.id,
-            service: slot.service,
-            providerId: assignedProvider,
-            chair: chair,
-            shift: getShiftFromTime(slot.time)
+            status: 'scheduled',
+            notes: `Cadeira ${chair} - ${getShiftFromTime(slot.time)}`,
           });
         }
       });
 
-      console.log('🔍 Agendamentos criados:', allAppointments);
+      console.log('🔍 Total de agendamentos a criar:', allAppointments.length);
 
-      const scheduleData = {
-        companyId: formData.companyId,
-        date: formData.date,
-        slots: allAppointments,
-        shiftProviders: {
-          morning: formData.selectedProviders,
-          afternoon: formData.selectedProviders,
-          evening: formData.selectedProviders
-        },
-        chairs: formData.chairs
-      };
+      // Definir progresso inicial
+      setProgress({ current: 0, total: allAppointments.length });
 
-      console.log('🔍 Dados enviados para onSubmit:', scheduleData);
-      
-      onSubmit(scheduleData);
-      
-      alert(`✅ Agendamento criado com sucesso!\n\n📊 Resumo:\n• ${slots.length} horários diferentes\n• ${formData.chairs} cadeira(s) por horário\n• ${allAppointments.length} slots totais criados\n• ${formData.selectedProviders.length} prestadores distribuídos\n\n🎯 Cada horário tem ${formData.chairs} vaga(s) disponível(is)!`);
-      
-      handleClose();
+      // 🔧 CORREÇÃO: Criar cada agendamento separadamente
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < allAppointments.length; i++) {
+        const appointment = allAppointments[i];
+        
+        try {
+          await onSubmit(appointment); // Envia um agendamento por vez
+          successCount++;
+          setProgress({ current: i + 1, total: allAppointments.length });
+        } catch (error) {
+          console.error(`Erro ao criar agendamento ${i + 1}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Exibir resultado
+      if (errorCount === 0) {
+        alert(`✅ Sucesso! ${successCount} agendamentos criados com sucesso!\n\n` +
+              `📋 Resumo:\n` +
+              `• ${slots.length} horários diferentes\n` +
+              `• ${formData.chairs} cadeiras por horário\n` +
+              `• ${allAppointments.length} slots totais criados\n` +
+              `• ${formData.selectedProviders.length} prestadores distribuídos\n\n` +
+              `Cada horário tem ${formData.chairs} vagas disponíveis!`);
+        handleClose();
+      } else {
+        alert(`⚠️ Processo concluído com avisos:\n\n` +
+              `✅ ${successCount} agendamentos criados\n` +
+              `❌ ${errorCount} falharam\n\n` +
+              `Verifique o console para mais detalhes.`);
+      }
+
     } catch (error) {
-      console.error('❌ Erro ao criar agendamento:', error);
-      alert('❌ Erro ao criar agendamento. Tente novamente.');
+      console.error('Erro ao criar agendamento:', error);
+      alert('Erro ao criar agendamento. Tente novamente.');
     } finally {
       setIsSubmitting(false);
+      setProgress({ current: 0, total: 0 });
     }
   };
 
   // Função para determinar o turno baseado no horário
   const getShiftFromTime = (time: string): string => {
     const hour = parseInt(time.split(':')[0]);
-    
     if (hour >= 6 && hour < 12) {
       return 'morning';
     } else if (hour >= 12 && hour < 18) {
@@ -252,14 +279,14 @@ export default function AdminCompanyScheduling({
       duration: 15,
       service: 'Quick Massage',
       breaks: [],
-      selectedProviders: []
+      selectedProviders: [],
     });
     onClose();
   };
 
   const slots = generateSlots();
   const totalAppointments = slots.length * formData.chairs;
-  const selectedCompany = companies.find(c => c.id === formData.companyId);
+  const selectedCompany = companies.find((c) => c.id === formData.companyId);
 
   if (!isOpen) return null;
 
@@ -270,33 +297,51 @@ export default function AdminCompanyScheduling({
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-blue-50">
           <div className="flex items-center space-x-3">
             <Building2 className="w-6 h-6 text-blue-600" />
-            <h2 className="text-xl font-semibold text-gray-900">
-              ⚡ Agendamento Rápido
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900">Agendamento Rápido</h2>
           </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Formulário Único */}
+        {/* Barra de Progresso */}
+        {isSubmitting && progress.total > 0 && (
+          <div className="px-6 pt-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-900">
+                  Criando agendamentos... {progress.current} de {progress.total}
+                </span>
+                <span className="text-sm font-medium text-blue-900">
+                  {Math.round((progress.current / progress.total) * 100)}%
+                </span>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Formulário único */}
         <div className="p-6 overflow-y-auto max-h-[calc(95vh-140px)]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Coluna 1: Configurações Básicas */}
             <div className="space-y-6">
               {/* 1. Empresa */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  🏢 Empresa *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Empresa</label>
                 <select
                   value={formData.companyId}
-                  onChange={(e) => setFormData({...formData, companyId: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
                   required
                 >
                   <option value="">Selecione a empresa</option>
-                  {companies.map(company => (
+                  {companies.map((company) => (
                     <option key={company.id} value={company.id}>
                       {company.name} ({company.employees.length} colaboradores)
                     </option>
@@ -306,13 +351,11 @@ export default function AdminCompanyScheduling({
 
               {/* 2. Data */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  📅 Data *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Data</label>
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
                   required
@@ -322,48 +365,52 @@ export default function AdminCompanyScheduling({
               {/* 3. Horários */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    🌅 Início
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Início</label>
                   <select
                     value={formData.startTime}
-                    onChange={(e) => setFormData({...formData, startTime: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    {availableTimeSlots.filter(time => time <= '12:00').map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
+                    {availableTimeSlots
+                      .filter((time) => time < '12:00')
+                      .map((time) => (
+                        <option key={time} value={time}>
+                          {time}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    🌆 Fim
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fim</label>
                   <select
                     value={formData.endTime}
-                    onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    {availableTimeSlots.filter(time => time > formData.startTime).map(time => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
+                    {availableTimeSlots
+                      .filter((time) => time > formData.startTime)
+                      .map((time) => (
+                        <option key={time} value={time}>
+                          {time}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
 
               {/* 4. Configuração Rápida */}
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h3 className="font-medium text-purple-900 mb-4">⚡ Configuração Rápida</h3>
-                
+                <h3 className="font-medium text-purple-900 mb-4">Configuração Rápida</h3>
+
                 {/* Cadeiras */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">🪑 Cadeiras</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cadeiras</label>
                   <div className="grid grid-cols-5 gap-2">
-                    {[1, 2, 3, 4, 5].map(num => (
+                    {[1, 2, 3, 4, 5].map((num) => (
                       <button
                         key={num}
                         type="button"
-                        onClick={() => setFormData({...formData, chairs: num})}
+                        onClick={() => setFormData({ ...formData, chairs: num })}
                         className={`p-2 rounded border-2 text-center transition-colors ${
                           formData.chairs === num
                             ? 'border-purple-500 bg-purple-100 text-purple-700'
@@ -379,13 +426,13 @@ export default function AdminCompanyScheduling({
 
                 {/* Duração */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ Duração</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Duração</label>
                   <div className="grid grid-cols-4 gap-2">
-                    {[15, 20, 30, 60].map(duration => (
+                    {[15, 20, 30, 60].map((duration) => (
                       <button
                         key={duration}
                         type="button"
-                        onClick={() => setFormData({...formData, duration})}
+                        onClick={() => setFormData({ ...formData, duration })}
                         className={`p-2 rounded border-2 text-center transition-colors ${
                           formData.duration === duration
                             ? 'border-purple-500 bg-purple-100 text-purple-700'
@@ -405,7 +452,7 @@ export default function AdminCompanyScheduling({
                       max="180"
                       step="1"
                       value={formData.duration}
-                      onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})}
+                      onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
                       className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
                       placeholder="Ex: 25, 45, 90..."
                     />
@@ -413,28 +460,20 @@ export default function AdminCompanyScheduling({
                       💡 Dica: Use múltiplos de 5 para melhor organização (5, 10, 15, 20...)
                     </p>
                   </div>
-                  <input
-                    type="number"
-                    min="5"
-                    max="120"
-                    step="5"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({...formData, duration: Number(e.target.value)})}
-                    className="w-full mt-2 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
-                    placeholder="Duração personalizada"
-                  />
                 </div>
 
                 {/* Serviço */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">💆 Serviço</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Serviço</label>
                   <select
                     value={formData.service}
-                    onChange={(e) => setFormData({...formData, service: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, service: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                   >
-                    {services.map(service => (
-                      <option key={service.id} value={service.name}>{service.name}</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.name}>
+                        {service.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -443,7 +482,7 @@ export default function AdminCompanyScheduling({
               {/* 5. Pausas */}
               <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-orange-900">⏸️ Pausas ({formData.breaks.length})</h3>
+                  <h3 className="font-medium text-orange-900">Pausas ({formData.breaks.length})</h3>
                   <div className="flex space-x-1">
                     <button
                       type="button"
@@ -467,7 +506,7 @@ export default function AdminCompanyScheduling({
                       className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                       title="Adicionar Reunião"
                     >
-                      👥
+                      📋
                     </button>
                     <button
                       type="button"
@@ -475,7 +514,7 @@ export default function AdminCompanyScheduling({
                       className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
                       title="Adicionar Descanso"
                     >
-                      😴
+                      💤
                     </button>
                     <button
                       type="button"
@@ -512,7 +551,6 @@ export default function AdminCompanyScheduling({
                           ❌
                         </button>
                       </div>
-                      
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-xs font-medium mb-1">Início</label>
@@ -521,11 +559,15 @@ export default function AdminCompanyScheduling({
                             onChange={(e) => updateBreak(breakItem.id, 'startTime', e.target.value)}
                             className="w-full p-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-orange-500"
                           >
-                            {availableTimeSlots.filter(time => 
-                              time >= formData.startTime && time < formData.endTime
-                            ).map(time => (
-                              <option key={time} value={time}>{time}</option>
-                            ))}
+                            {availableTimeSlots
+                              .filter(
+                                (time) => time >= formData.startTime && time <= formData.endTime
+                              )
+                              .map((time) => (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              ))}
                           </select>
                         </div>
                         <div>
@@ -535,21 +577,22 @@ export default function AdminCompanyScheduling({
                             onChange={(e) => updateBreak(breakItem.id, 'endTime', e.target.value)}
                             className="w-full p-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-orange-500"
                           >
-                            {availableTimeSlots.filter(time => 
-                              time > breakItem.startTime && time <= formData.endTime
-                            ).map(time => (
-                              <option key={time} value={time}>{time}</option>
-                            ))}
+                            {availableTimeSlots
+                              .filter((time) => time > breakItem.startTime && time <= formData.endTime)
+                              .map((time) => (
+                                <option key={time} value={time}>
+                                  {time}
+                                </option>
+                              ))}
                           </select>
                         </div>
                       </div>
-                      
                       <div className="mt-2 text-xs opacity-75">
-                        Duração: {Math.round((timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime)))} minutos
+                        Duração: {Math.round(timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime))}{' '}
+                        minutos
                       </div>
                     </div>
                   ))}
-                  
                   {formData.breaks.length === 0 && (
                     <div className="text-center py-4 text-orange-700">
                       <p className="text-sm">Nenhuma pausa adicionada</p>
@@ -565,10 +608,10 @@ export default function AdminCompanyScheduling({
               {/* 6. Prestadores */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  👨‍⚕️ Prestadores * ({formData.selectedProviders.length} selecionados)
+                  Prestadores ({formData.selectedProviders.length} selecionados)
                 </label>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {providers.map(provider => (
+                  {providers.map((provider) => (
                     <label
                       key={provider.id}
                       className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
@@ -601,8 +644,8 @@ export default function AdminCompanyScheduling({
 
               {/* 7. Preview da Grade */}
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h3 className="font-medium text-blue-900 mb-4">📋 Preview da Grade</h3>
-                
+                <h3 className="font-medium text-blue-900 mb-4">Preview da Grade</h3>
+
                 {formData.companyId && formData.date && (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-4 text-sm">
@@ -624,16 +667,31 @@ export default function AdminCompanyScheduling({
                       </div>
                     </div>
 
+                    {/* Estatísticas */}
                     <div className="bg-green-100 p-3 rounded border border-green-300">
-                      <h4 className="font-medium text-green-900 mb-2">📊 Estatísticas:</h4>
+                      <h4 className="font-medium text-green-900 mb-2">Estatísticas</h4>
                       <div className="text-green-800 text-sm space-y-1">
-                        <div>🕐 <strong>{slots.length}</strong> horários gerados</div>
-                        <div>🪑 <strong>{formData.chairs}</strong> cadeira{formData.chairs > 1 ? 's' : ''} por horário</div>
-                        <div>📋 <strong>{totalAppointments}</strong> agendamentos totais</div>
-                        <div>👨‍⚕️ <strong>{formData.selectedProviders.length}</strong> prestador{formData.selectedProviders.length > 1 ? 'es' : ''}</div>
-                        <div>⏸️ <strong>{formData.breaks.length}</strong> pausa{formData.breaks.length !== 1 ? 's' : ''}</div>
+                        <div>
+                          <strong>{slots.length}</strong> horários gerados
+                        </div>
+                        <div>
+                          <strong>{formData.chairs}</strong> cadeira{formData.chairs !== 1 && 's'} por horário
+                        </div>
+                        <div>
+                          <strong>{totalAppointments}</strong> agendamentos totais
+                        </div>
+                        <div>
+                          <strong>{formData.selectedProviders.length}</strong> prestador
+                          {formData.selectedProviders.length !== 1 && 'es'}
+                        </div>
+                        <div>
+                          <strong>{formData.breaks.length}</strong> pausa{formData.breaks.length !== 1 && 's'}
+                        </div>
                         {formData.selectedProviders.length > 0 && (
-                          <div>📈 <strong>{Math.ceil(totalAppointments / formData.selectedProviders.length)}</strong> agendamentos por prestador</div>
+                          <div>
+                            <strong>~{Math.ceil(totalAppointments / formData.selectedProviders.length)}</strong>{' '}
+                            agendamentos por prestador
+                          </div>
                         )}
                       </div>
                     </div>
@@ -641,7 +699,7 @@ export default function AdminCompanyScheduling({
                     {/* Preview dos Horários */}
                     {slots.length > 0 && (
                       <div className="bg-white p-3 rounded border max-h-32 overflow-y-auto">
-                        <h4 className="font-medium text-gray-900 mb-2">🕐 Horários Gerados:</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">Horários Gerados</h4>
                         <div className="grid grid-cols-3 gap-1 text-xs">
                           {slots.slice(0, 12).map((slot, index) => (
                             <div key={index} className="bg-gray-100 p-1 rounded text-center">
@@ -649,23 +707,25 @@ export default function AdminCompanyScheduling({
                             </div>
                           ))}
                           {slots.length > 12 && (
-                            <div className="bg-gray-200 p-1 rounded text-center">
-                              +{slots.length - 12}
-                            </div>
+                            <div className="bg-gray-200 p-1 rounded text-center">+{slots.length - 12}</div>
                           )}
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Preview das Pausas */}
                     {formData.breaks.length > 0 && (
                       <div className="bg-white p-3 rounded border">
-                        <h4 className="font-medium text-gray-900 mb-2">⏸️ Pausas Configuradas:</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">Pausas Configuradas</h4>
                         <div className="space-y-1">
                           {formData.breaks.map((breakItem) => (
                             <div key={breakItem.id} className="text-xs flex items-center justify-between">
-                              <span>{getBreakIcon(breakItem.type)} {breakItem.name}</span>
-                              <span className="text-gray-600">{breakItem.startTime} - {breakItem.endTime}</span>
+                              <span>
+                                {getBreakIcon(breakItem.type)} {breakItem.name}
+                              </span>
+                              <span className="text-gray-600">
+                                {breakItem.startTime} - {breakItem.endTime}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -681,22 +741,21 @@ export default function AdminCompanyScheduling({
         {/* Footer */}
         <div className="flex justify-between items-center p-4 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-600">
-            {totalAppointments > 0 && (
-              <span>📋 {totalAppointments} agendamentos serão criados</span>
-            )}
+            {totalAppointments > 0 && <span>{totalAppointments} agendamentos serão criados</span>}
           </div>
-
           <div className="flex space-x-3">
             <button
               onClick={handleClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
-
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || !formData.companyId || !formData.date || formData.selectedProviders.length === 0}
+              disabled={
+                isSubmitting || !formData.companyId || !formData.date || formData.selectedProviders.length === 0
+              }
               className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
@@ -707,7 +766,7 @@ export default function AdminCompanyScheduling({
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  <span>🚀 Criar Agendamentos</span>
+                  <span>Criar Agendamentos</span>
                 </>
               )}
             </button>
