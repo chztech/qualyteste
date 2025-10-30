@@ -38,6 +38,24 @@ const toYMD = (d: Date) => {
   return `${y}-${m}-${dd}`;
 };
 
+
+const handleAdminSchedulingSubmitSingle = async (appointment: any) => {
+  return apiService.createAppointment({
+    companyId: appointment.companyId,
+    providerId: appointment.providerId,
+    clientId: appointment.clientId ?? appointment.companyId,
+    employeeId: appointment.employeeId ?? null,
+    serviceId: appointment.serviceId,
+    date: appointment.date,
+    startTime: appointment.startTime,
+    endTime: appointment.endTime,
+    duration: appointment.duration,
+    status: appointment.status ?? 'scheduled',
+    notes: appointment.notes ?? null,
+  });
+};
+
+
 function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
