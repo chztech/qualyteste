@@ -256,6 +256,45 @@ function App() {
     }
   }, [isPublicBookingPage, fetchPublicData]);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    let isSyncing = false;
+
+    const syncData = async () => {
+      if (isSyncing) return;
+      isSyncing = true;
+      try {
+        await loadInitialData();
+      } finally {
+        isSyncing = false;
+      }
+    };
+
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        void syncData();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    const intervalId = window.setInterval(() => {
+      void syncData();
+    }, 60000);
+
+    void syncData();
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+      window.clearInterval(intervalId);
+    };
+  }, [isAuthenticated, loadInitialData]);
+
   // Employee management functions for companies
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
     const company = companies.find(
