@@ -1,18 +1,48 @@
 <?php
-$allowed = array_filter(array_map('trim', explode(',', getenv('ALLOWED_ORIGINS') ?: 'https://qualycorpore.netlify.app,http://localhost:5173')));
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$defaultAllowed = [
+    'https://qualycorpore.netlify.app',
+    'https://qualycorpore.chztech.com.br', // <-- ADICIONE ESTA
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+];
 
-if ($origin && in_array($origin, $allowed, true)) {
+$allowedEnv = getenv('ALLOWED_ORIGINS');
+$allowedList = $defaultAllowed;
+
+if ($allowedEnv !== false && trim($allowedEnv) !== '') {
+    foreach (explode(',', $allowedEnv) as $item) {
+        $item = trim($item);
+        if ($item !== '') {
+            $allowedList[] = $item;
+        }
+    }
+}
+
+$normalizedToOriginal = [];
+foreach ($allowedList as $item) {
+    $normalized = rtrim($item, '/');
+    if (!isset($normalizedToOriginal[$normalized])) {
+        $normalizedToOriginal[$normalized] = $item;
+    }
+}
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$normalizedOrigin = rtrim($origin, '/');
+
+if ($origin && $normalizedOrigin !== '' && isset($normalizedToOriginal[$normalizedOrigin])) {
     header("Access-Control-Allow-Origin: $origin");
 } else {
-    header("Access-Control-Allow-Origin: https://qualycorpore.netlify.app");
+    $firstAllowed = reset($normalizedToOriginal) ?: 'https://qualycorpore.netlify.app';
+    header("Access-Control-Allow-Origin: $firstAllowed");
 }
+
 header('Vary: Origin');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 header('Access-Control-Allow-Credentials: true');
 header('Content-Type: application/json; charset=UTF-8');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    json_end(200, ['success' => true]); // usa helper do bootstrap
+    http_response_code(204);
+    exit();
 }

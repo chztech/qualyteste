@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import Header from "./components/Layout/Header";
 import Sidebar from "./components/Layout/Sidebar";
 import CalendarHeader from "./components/Calendar/CalendarHeader";
@@ -38,24 +38,6 @@ const toYMD = (d: Date) => {
   return `${y}-${m}-${dd}`;
 };
 
-
-const handleAdminSchedulingSubmitSingle = async (appointment: any) => {
-  return apiService.createAppointment({
-    companyId: appointment.companyId,
-    providerId: appointment.providerId,
-    clientId: appointment.clientId ?? appointment.companyId,
-    employeeId: appointment.employeeId ?? null,
-    serviceId: appointment.serviceId,
-    date: appointment.date,
-    startTime: appointment.startTime,
-    endTime: appointment.endTime,
-    duration: appointment.duration,
-    status: appointment.status ?? 'scheduled',
-    notes: appointment.notes ?? null,
-  });
-};
-
-
 function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -91,6 +73,8 @@ function App() {
       try {
         const effectiveRole = roleOverride ?? currentUser?.role;
 
+        const hasAuth = apiService.hasAuthToken() && !!effectiveRole;
+
         const [
           companiesRes,
           providersRes,
@@ -101,8 +85,10 @@ function App() {
           apiService.getCompanies(),
           apiService.getProviders(),
           apiService.getServices(),
-          apiService.getAppointments(),
-          effectiveRole === "admin"
+          hasAuth
+            ? apiService.getAppointments()
+            : Promise.resolve({ success: true, data: [] }),
+          hasAuth && effectiveRole === "admin"
             ? apiService.getUsers()
             : Promise.resolve({ success: true, data: [] }),
         ]);
@@ -142,7 +128,7 @@ function App() {
         }
       } catch (error) {
         console.error("Erro ao carregar dados iniciais:", error);
-        setDataError("Não foi possível carregar os dados do sistema.");
+        setDataError("NÃ£o foi possÃ­vel carregar os dados do sistema.");
       } finally {
         setIsBootstrapping(false);
       }
@@ -186,69 +172,80 @@ function App() {
       .padStart(2, "0")}`;
   };
 
-  // 🎯 Identificar página pública
+  // ðŸŽ¯ Identificar pÃ¡gina pÃºblica
   const isPublicBookingPage = React.useCallback(() => {
     try {
       const path = window.location.pathname;
-      const isBookingRoute =
-        path.startsWith("/agendamento/") &&
-        path.length > "/agendamento/".length;
-      if (!isBookingRoute) return false;
-
-      // valida token
-      const token = path.split("/agendamento/")[1];
-      try {
-        const decoded = atob(token);
-        const isValidToken =
-          decoded && decoded.length > 0 && !decoded.includes(" ");
-        return isValidToken;
-      } catch {
+      if (!path.startsWith("/agendamento/")) {
         return false;
       }
+      const token = path.split("/agendamento/")[1] ?? "";
+      return token.trim().length > 0;
     } catch (error) {
       console.error("Erro ao verificar página pública:", error);
       return false;
     }
   }, []);
 
-  // 🎯 Obter token da URL
+  // ðŸŽ¯ Obter token da URL
   const getBookingToken = React.useCallback(() => {
     try {
       const path = window.location.pathname;
-      const token = path.split("/agendamento/")[1];
-      return token;
+      const rawToken = path.split("/agendamento/")[1];
+      return rawToken ? rawToken.trim() : null;
     } catch (error) {
       console.error("Erro ao extrair token:", error);
       return null;
     }
   }, []);
 
-  // 🔄 Carregar dados públicos sem exigir login (GETs)
-  useEffect(() => {
-    const run = async () => {
-      if (isPublicBookingPage()) {
-        try {
-          const [companiesRes, providersRes, servicesRes, appointmentsRes] =
-            await Promise.all([
-              apiService.getCompanies(),
-              apiService.getProviders(),
-              apiService.getServices(),
-              apiService.getAppointments(),
-            ]);
+  const fetchPublicData = React.useCallback(async () => {
+    if (!isPublicBookingPage()) {
+      return;
+    }
 
-          setCompanies(companiesRes.success ? companiesRes.data ?? [] : []);
-          setProviders(providersRes.success ? providersRes.data ?? [] : []);
-          setServices(servicesRes.success ? servicesRes.data ?? [] : []);
-          setAppointments(
-            appointmentsRes.success ? appointmentsRes.data ?? [] : []
-          );
-        } catch (e) {
-          console.error("Falha ao carregar dados públicos:", e);
-        }
-      }
-    };
-    run();
-  }, [isPublicBookingPage]);
+    const token = getBookingToken();
+    if (!token) {
+      setDataError("Link de agendamento inválido.");
+      setCompanies([]);
+      setProviders([]);
+      setServices([]);
+      setAppointments([]);
+      return;
+    }
+
+    setIsBootstrapping(true);
+    setDataError(null);
+
+    try {
+      const [companiesRes, providersRes, servicesRes, appointmentsRes] =
+        await Promise.all([
+          apiService.getCompanies(),
+          apiService.getProviders(),
+          apiService.getServices(),
+          apiService.getPublicAppointments(token),
+        ]);
+
+      setCompanies(companiesRes.success ? companiesRes.data ?? [] : []);
+      setProviders(providersRes.success ? providersRes.data ?? [] : []);
+      setServices(servicesRes.success ? servicesRes.data ?? [] : []);
+      setAppointments(
+        appointmentsRes.success ? appointmentsRes.data ?? [] : []
+      );
+    } catch (error) {
+      console.error("Falha ao carregar dados públicos:", error);
+      setDataError("Não foi possível carregar os dados públicos.");
+    } finally {
+      setIsBootstrapping(false);
+    }
+  }, [getBookingToken, isPublicBookingPage]);
+
+  // ?Y"" Carregar dados públicos sem exigir login (GETs)
+  useEffect(() => {
+    if (isPublicBookingPage()) {
+      fetchPublicData();
+    }
+  }, [isPublicBookingPage, fetchPublicData]);
 
   // Employee management functions for companies
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
@@ -269,7 +266,7 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao adicionar colaborador:", error);
-      alert("Não foi possível adicionar o colaborador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel adicionar o colaborador. Tente novamente.");
     }
   };
 
@@ -293,7 +290,7 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar colaborador:", error);
-      alert("Não foi possível atualizar o colaborador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel atualizar o colaborador. Tente novamente.");
     }
   };
 
@@ -318,11 +315,11 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir colaborador:", error);
-      alert("Não foi possível excluir o colaborador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel excluir o colaborador. Tente novamente.");
     }
   };
 
-  // 🔑 Login
+  // ðŸ”‘ Login
   const handleLogin = async (email: string, password: string) => {
     try {
       const response = await apiService.login(email, password);
@@ -359,10 +356,10 @@ function App() {
       const message = response.error || "Falha no login";
       return { success: false as const, message };
     } catch (error) {
-      console.error("❌ Erro no login:", error);
+      console.error("âŒ Erro no login:", error);
       return {
         success: false as const,
-        message: "Erro de conexão com o servidor",
+        message: "Erro de conexÃ£o com o servidor",
       };
     }
   };
@@ -385,7 +382,7 @@ function App() {
     setViewMode("day");
   };
 
-  // 🎯 Novo: clique da empresa no calendário (tooltip simples)
+  // ðŸŽ¯ Novo: clique da empresa no calendÃ¡rio (tooltip simples)
   const handleCompanyClick = (company: Company, ymd: string, time?: string) => {
     const companyAppointments = appointments.filter(
       (apt) =>
@@ -396,13 +393,13 @@ function App() {
 
     if (companyAppointments.length > 0) {
       alert(
-        `🏢 ${company.name}\n📅 ${new Date(
+        `ðŸ¢ ${company.name}\nðŸ“… ${new Date(
           ymd + "T12:00:00"
-        ).toLocaleDateString("pt-BR")}\n${time ? `🕐 ${time}\n` : ""}\n📊 ${
+        ).toLocaleDateString("pt-BR")}\n${time ? `ðŸ• ${time}\n` : ""}\nðŸ“Š ${
           companyAppointments.length
         } agendamento(s)\n\n${companyAppointments
           .map(
-            (apt) => `• ${apt.startTime} - ${apt.service} (${apt.duration}min)`
+            (apt) => `â€¢ ${apt.startTime} - ${apt.service} (${apt.duration}min)`
           )
           .join("\n")}`
       );
@@ -449,7 +446,7 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao salvar agendamento:", error);
-      alert("Não foi possível salvar o agendamento. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel salvar o agendamento. Tente novamente.");
     } finally {
       setSelectedAppointment(null);
       setSelectedDate(null);
@@ -466,7 +463,7 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar agendamento:", error);
-      alert("Não foi possível atualizar o agendamento. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel atualizar o agendamento. Tente novamente.");
     }
   };
 
@@ -476,11 +473,11 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir agendamento:", error);
-      alert("Não foi possível excluir o agendamento. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel excluir o agendamento. Tente novamente.");
     }
   };
 
-  // Atualizar múltiplos agendamentos
+  // Atualizar mÃºltiplos agendamentos
   const handleUpdateMultipleAppointments = async (
     appointmentIds: string[],
     updateData: Partial<Appointment>
@@ -492,11 +489,11 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar agendamentos:", error);
-      alert("Não foi possível atualizar os agendamentos selecionados.");
+      alert("NÃ£o foi possÃ­vel atualizar os agendamentos selecionados.");
     }
   };
 
-  // Excluir múltiplos agendamentos
+  // Excluir mÃºltiplos agendamentos
   const handleDeleteMultipleAppointments = async (appointmentIds: string[]) => {
     if (appointmentIds.length === 0) return;
 
@@ -505,7 +502,7 @@ function App() {
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir agendamentos:", error);
-      alert("Não foi possível excluir os agendamentos selecionados.");
+      alert("NÃ£o foi possÃ­vel excluir os agendamentos selecionados.");
     }
   };
 
@@ -535,31 +532,31 @@ function App() {
             notes:
               `Agendamento administrativo - Cadeira ${slot.chair}/${chairs}` +
               (providerName ? ` - Prestador: ${providerName}` : "") +
-              (service ? ` - Serviço: ${service.name}` : ""),
+              (service ? ` - ServiÃ§o: ${service.name}` : ""),
           });
         })
       );
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao criar agendamentos:", error);
-      alert("Não foi possível criar os agendamentos. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel criar os agendamentos. Tente novamente.");
     }
   };
 
   // Company booking (empresa aloca colaborador)
-  // 🔧 CORRIGIDO: Company booking: empresa aloca colaborador
+  // ðŸ”§ CORRIGIDO: Company booking: empresa aloca colaborador
 const handleCompanyBookAppointment = async (
   appointmentData: Omit<Appointment, 'id' | 'createdAt' | 'updatedAt'>
 ) => {
-  console.log('📤 Criando agendamento individual:', appointmentData);
+  console.log('ðŸ“¤ Criando agendamento individual:', appointmentData);
   
   try {
-    // Validações básicas
-    if (!appointmentData.companyId) throw new Error('Company ID é obrigatório');
-    if (!appointmentData.providerId) throw new Error('Provider ID é obrigatório');
-    if (!appointmentData.serviceId) throw new Error('Service ID é obrigatório');
-    if (!appointmentData.date) throw new Error('Data é obrigatória');
-    if (!appointmentData.startTime) throw new Error('Horário é obrigatório');
+    // ValidaÃ§Ãµes bÃ¡sicas
+    if (!appointmentData.companyId) throw new Error('Company ID Ã© obrigatÃ³rio');
+    if (!appointmentData.providerId) throw new Error('Provider ID Ã© obrigatÃ³rio');
+    if (!appointmentData.serviceId) throw new Error('Service ID Ã© obrigatÃ³rio');
+    if (!appointmentData.date) throw new Error('Data Ã© obrigatÃ³ria');
+    if (!appointmentData.startTime) throw new Error('HorÃ¡rio Ã© obrigatÃ³rio');
     
     // Criar agendamento
     const response = await apiService.createAppointment({
@@ -576,13 +573,13 @@ const handleCompanyBookAppointment = async (
       notes: appointmentData.notes || null,
     });
     
-    console.log('✅ Agendamento criado:', response);
+    console.log('âœ… Agendamento criado:', response);
     
-    // ✅ RETORNA OBJETO PARA O LOOP VERIFICAR
+    // âœ… RETORNA OBJETO PARA O LOOP VERIFICAR
     return { success: true, data: response };
     
   } catch (error: any) {
-    console.error('❌ Erro ao criar agendamento:', error);
+    console.error('âŒ Erro ao criar agendamento:', error);
     return { success: false, error: error.message || 'Erro desconhecido' };
   }
 };
@@ -612,7 +609,7 @@ const handleCompanyBookAppointment = async (
         throw new Error(response.error || "Falha ao confirmar agendamento.");
       }
 
-      await loadInitialData(currentUser?.role);
+        await fetchPublicData();
 
       alert(
         "Agendamento realizado com sucesso!\\n\\nSeu horario foi confirmado. Em caso de duvidas, entre em contato com a empresa."
@@ -673,13 +670,13 @@ const handleCompanyBookAppointment = async (
         )
       );
 
-      await loadInitialData(currentUser?.role);
+        await fetchPublicData();
 
       return employee.id;
     } catch (error) {
       console.error("Erro ao adicionar colaborador publico:", error);
       alert("Nao foi possivel adicionar o colaborador. Tente novamente.");
-      await loadInitialData(currentUser?.role);
+      await fetchPublicData();
       return "";
     }
   };
@@ -699,7 +696,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao cadastrar prestador:", error);
-      alert("Não foi possível cadastrar o prestador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel cadastrar o prestador. Tente novamente.");
     }
   };
 
@@ -712,7 +709,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar prestador:", error);
-      alert("Não foi possível atualizar o prestador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel atualizar o prestador. Tente novamente.");
     }
   };
 
@@ -726,11 +723,11 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir prestador:", error);
-      alert("Não foi possível excluir o prestador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel excluir o prestador. Tente novamente.");
     }
   };
 
-  // ✅ Alterar senha do prestador (faltava no App)
+  // âœ… Alterar senha do prestador (faltava no App)
   const handleChangeProviderPassword = async (
     providerId: string,
     password: string
@@ -742,7 +739,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData(currentUser?.role);
     } catch (error) {
       console.error("Erro ao alterar senha do prestador:", error);
-      alert("Não foi possível alterar a senha do prestador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel alterar a senha do prestador. Tente novamente.");
     }
   };
 
@@ -785,7 +782,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData(currentUser?.role);
     } catch (error) {
       console.error("Erro ao cadastrar empresa:", error);
-      alert("Não foi possível cadastrar a empresa. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel cadastrar a empresa. Tente novamente.");
     }
   };
 
@@ -798,7 +795,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar empresa:", error);
-      alert("Não foi possível atualizar a empresa. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel atualizar a empresa. Tente novamente.");
     }
   };
 
@@ -812,7 +809,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir empresa:", error);
-      alert("Não foi possível excluir a empresa. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel excluir a empresa. Tente novamente.");
     }
   };
 
@@ -828,7 +825,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData(currentUser?.role);
     } catch (error) {
       console.error("Erro ao alterar senha da empresa:", error);
-      alert("Não foi possível alterar a senha. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel alterar a senha. Tente novamente.");
     }
   };
 
@@ -845,8 +842,8 @@ const handleCompanyBookAppointment = async (
       });
       await loadInitialData();
     } catch (error) {
-      console.error("Erro ao cadastrar serviço:", error);
-      alert("Não foi possível cadastrar o serviço. Tente novamente.");
+      console.error("Erro ao cadastrar serviÃ§o:", error);
+      alert("NÃ£o foi possÃ­vel cadastrar o serviÃ§o. Tente novamente.");
     }
   };
 
@@ -858,13 +855,13 @@ const handleCompanyBookAppointment = async (
       await apiService.updateService(id, serviceData);
       await loadInitialData();
     } catch (error) {
-      console.error("Erro ao atualizar serviço:", error);
-      alert("Não foi possível atualizar o serviço. Tente novamente.");
+      console.error("Erro ao atualizar serviÃ§o:", error);
+      alert("NÃ£o foi possÃ­vel atualizar o serviÃ§o. Tente novamente.");
     }
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este serviço?")) {
+    if (!confirm("Tem certeza que deseja excluir este serviÃ§o?")) {
       return;
     }
 
@@ -872,8 +869,8 @@ const handleCompanyBookAppointment = async (
       await apiService.deleteService(id);
       await loadInitialData();
     } catch (error) {
-      console.error("Erro ao excluir serviço:", error);
-      alert("Não foi possível excluir o serviço. Tente novamente.");
+      console.error("Erro ao excluir serviÃ§o:", error);
+      alert("NÃ£o foi possÃ­vel excluir o serviÃ§o. Tente novamente.");
     }
   };
 
@@ -894,7 +891,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao cadastrar administrador:", error);
-      alert("Não foi possível cadastrar o administrador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel cadastrar o administrador. Tente novamente.");
     }
   };
 
@@ -907,7 +904,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar administrador:", error);
-      alert("Não foi possível atualizar o administrador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel atualizar o administrador. Tente novamente.");
     }
   };
 
@@ -921,7 +918,7 @@ const handleCompanyBookAppointment = async (
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao excluir administrador:", error);
-      alert("Não foi possível excluir o administrador. Tente novamente.");
+      alert("NÃ£o foi possÃ­vel excluir o administrador. Tente novamente.");
     }
   };
 
@@ -979,7 +976,7 @@ const handleCompanyBookAppointment = async (
     // Company Dashboard
     if (currentUser.role === "company") {
       const userCompany = companies.find((c) => c.id === currentUser.companyId);
-      if (!userCompany) return <div>Empresa não encontrada</div>;
+      if (!userCompany) return <div>Empresa nÃ£o encontrada</div>;
 
       return (
         <CompanyDashboard
@@ -1002,7 +999,7 @@ const handleCompanyBookAppointment = async (
     // Provider Dashboard
     if (currentUser.role === "provider" && activeTab === "my-schedule") {
       const provider = providers.find((p) => p.id === currentUser.id);
-      if (!provider) return <div>Prestador não encontrado</div>;
+      if (!provider) return <div>Prestador nÃ£o encontrado</div>;
 
       return (
         <ProviderDashboard
@@ -1120,7 +1117,7 @@ const handleCompanyBookAppointment = async (
         return (
           <LogoCustomization
             onSave={(config) => {
-              console.log("✅ Configurações de logo aplicadas:", config);
+              console.log("âœ… ConfiguraÃ§Ãµes de logo aplicadas:", config);
             }}
           />
         );
@@ -1142,7 +1139,7 @@ const handleCompanyBookAppointment = async (
     }
   };
 
-  // 🔓 Página pública SEM exigir login
+  // ðŸ”“ PÃ¡gina pÃºblica SEM exigir login
   if (isPublicBookingPage()) {
     const token = getBookingToken();
     if (token) {
@@ -1161,7 +1158,7 @@ const handleCompanyBookAppointment = async (
     }
   }
 
-  // Tela de login se não autenticado
+  // Tela de login se nÃ£o autenticado
   if (!isAuthenticated) {
     return <LoginForm onLogin={handleLogin} />;
   }
@@ -1260,3 +1257,8 @@ const handleCompanyBookAppointment = async (
 }
 
 export default App;
+
+
+
+
+

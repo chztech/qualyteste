@@ -19,10 +19,10 @@ if ($_SESSION['login_attempts'] > 5) {
     echo json_encode(['success' => false, 'error' => 'Too many login attempts. Try again later.']);
     exit;
 }
-require_once '/../bootstrap.php';
-require_once '../config/cors.php';
-require_once '../config/database.php';
-require_once '../config/jwt.php';
+require_once dirname(__DIR__) . '/bootstrap.php';
+require_once dirname(__DIR__) . '/config/cors.php';
+require_once dirname(__DIR__) . '/config/database.php';
+require_once dirname(__DIR__) . '/config/jwt.php';
 
 // Garante o Content-Type (caso cors.php não tenha definido)
 header('Content-Type: application/json; charset=UTF-8');
@@ -103,6 +103,11 @@ try {
 } catch (Throwable $e) {
     if (ob_get_length() !== false) { ob_clean(); }
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Internal server error']);
+    error_log('Auth login fatal: ' . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Internal server error',
+        'debug' => $e->getMessage()
+    ]);
     exit;
 }

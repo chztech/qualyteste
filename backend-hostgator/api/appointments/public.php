@@ -9,9 +9,52 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 $database = new Database();
 $db = $database->getConnection();
 
-$companyId = isset($_GET['companyId']) ? trim($_GET['companyId']) : '';
-if ($companyId === '') {
-  jsonResponse(false, null, 422, 'companyId is required');
+$companyIdParam = isset($_GET['companyId']) ? trim((string)$_GET['companyId']) : '';
+$companyToken = isset($_GET['companyToken']) ? trim((string)$_GET['companyToken']) : '';
+
+if (!function_exists('resolveCompanyId')) {
+  function resolveCompanyId(PDO $db, string $token): ?string {
+    if ($token === '') {
+      return null;
+    }
+
+    $stmt = $db->prepare('SELECT id FROM companies WHERE public_token = ? LIMIT 1');
+    $stmt->execute([$token]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row && isset($row['id'])) {
+      return $row['id'];
+    }
+
+    $decoded = base64_decode($token, true);
+    if ($decoded !== false && $decoded !== '') {
+      $stmt = $db->prepare('SELECT id FROM companies WHERE id = ? LIMIT 1');
+      $stmt->execute([$decoded]);
+      $row = $stmt->fetch(PDO::FETCH_ASSOC);
+      if ($row && isset($row['id'])) {
+        return $row['id'];
+      }
+    }
+
+    $stmt = $db->prepare('SELECT id FROM companies WHERE id = ? LIMIT 1');
+    $stmt->execute([$token]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($row && isset($row['id'])) {
+      return $row['id'];
+    }
+
+    return null;
+  }
+}
+
+$companyId = null;
+if ($companyToken !== '') {
+  $companyId = resolveCompanyId($db, $companyToken);
+} elseif ($companyIdParam !== '') {
+  $companyId = $companyIdParam;
+}
+
+if (!$companyId) {
+  jsonResponse(false, null, 404, 'Company not found for provided token');
 }
 
 try {

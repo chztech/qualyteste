@@ -32,9 +32,7 @@ interface PublicBookingProps {
     employeeId?: string;
     notes?: string;
   }) => void | Promise<void>;
-  onAddEmployee: (
-    employeeData: Omit<Employee, "id">
-  ) => string | Promise<string>;
+  onAddEmployee: (employeeData: Omit<Employee, "id">) => string | Promise<string>;
 }
 
 interface AvailableSlot {
@@ -96,8 +94,14 @@ export default function PublicBooking({
   );
 
   const company = useMemo(
-    () => companies.find((c) => c.id === companyId),
-    [companies, companyId]
+    () =>
+      companies.find(
+        (c) =>
+          c.id === companyId ||
+          c.id === companyToken ||
+          (typeof c.publicToken === "string" && c.publicToken === companyToken)
+      ),
+    [companies, companyId, companyToken]
   );
 
   // --- helpers turno ---
@@ -316,7 +320,7 @@ export default function PublicBooking({
   ]);
 
   // --- Renderização de estados especiais ---
-  if (!companyId) {
+  if (!companyId && !company) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white p-6 rounded-lg shadow-lg text-center max-w-md w-full">
@@ -635,7 +639,7 @@ export default function PublicBooking({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getAvailableDates().map((dateInfo) => (
+                {availableDates.map((dateInfo) => (
                   <button
                     key={dateInfo.date}
                     onClick={() => setSelectedDate(dateInfo.date)}
@@ -662,6 +666,7 @@ export default function PublicBooking({
                         {dateInfo.totalSlots > 1 ? "s" : ""} disponível
                         {dateInfo.totalSlots > 1 ? "is" : ""}
                       </div>
+
                       <div className="space-y-1">
                         {dateInfo.shifts.morning > 0 && (
                           <div className="flex items-center space-x-1">

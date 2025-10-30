@@ -2,6 +2,13 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/functions.php';
+
+$auth = requireAuth();
+$role = $auth['role'] ?? null;
+if (!in_array($role, ['admin', 'provider'], true)) {
+  json_end(403, ['success' => false, 'error' => 'Forbidden']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'PUT' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   json_end(405, ['success' => false, 'error' => 'Method not allowed']);
@@ -21,6 +28,29 @@ if ($newPassword === '') {
 $db = (new Database())->getConnection();
 
 try {
+  if ($role === 'provider') {
+    $authUserId = $auth['user_id'] ?? null;
+    if (!$authUserId) {
+      json_end(403, ['success' => false, 'error' => 'Forbidden']);
+    }
+
+    if ($userId && $userId !== $authUserId) {
+      json_end(403, ['success' => false, 'error' => 'Forbidden']);
+    }
+
+    if ($providerId) {
+      $stmtVerify = $db->prepare("SELECT user_id FROM providers WHERE id = ? LIMIT 1");
+      $stmtVerify->execute([$providerId]);
+      $row = $stmtVerify->fetch(PDO::FETCH_ASSOC);
+      if (!$row || $row['user_id'] !== $authUserId) {
+        json_end(403, ['success' => false, 'error' => 'Forbidden']);
+      }
+      $userId = $row['user_id'];
+    } else {
+      $userId = $authUserId;
+    }
+  }
+
   if (!$userId) {
     if (!$providerId) json_end(400, ['success' => false, 'error' => 'userId or providerId is required']);
     $stmt = $db->prepare("SELECT user_id FROM providers WHERE id = ? LIMIT 1");

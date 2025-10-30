@@ -12,20 +12,22 @@ if ($method === 'OPTIONS') {
   json_end(200, ['success' => true]);
 }
 
-// Se quiser exigir auth, descomente o bloco abaixo:
-// $token = getBearerToken();
-// $payload = $token ? jwt_verify($token) : false;
-// if (!$payload) {
-//   json_end(401, ['success' => false, 'error' => 'Unauthorized']);
-// }
+if ($method !== 'GET') {
+  $auth = requireAuth();
+  if (($auth['role'] ?? '') !== 'admin') {
+    json_end(403, ['success' => false, 'error' => 'Forbidden']);
+  }
+}
 
 try {
   $db = (new Database())->getConnection();
 
-  // Lê corpo JSON de forma segura
+  // lê corpo JSON de forma segura
   $raw = file_get_contents('php://input');
   $payload = json_decode($raw, true);
-  if (!is_array($payload)) { $payload = $_POST; }
+  if (!is_array($payload)) {
+    $payload = $_POST;
+  }
 
   if ($method === 'GET') {
     // filtros opcionais
@@ -46,8 +48,12 @@ try {
 
     // normalizações
     foreach ($rows as &$r) {
-      if (isset($r['duration'])) $r['duration'] = (int)$r['duration'];
-      if (isset($r['price']) && $r['price'] !== null) $r['price'] = (float)$r['price'];
+      if (isset($r['duration'])) {
+        $r['duration'] = (int)$r['duration'];
+      }
+      if (isset($r['price']) && $r['price'] !== null) {
+        $r['price'] = (float)$r['price'];
+      }
       $r['is_active'] = isset($r['is_active']) ? (bool)intval($r['is_active']) : true;
     }
 
@@ -65,7 +71,6 @@ try {
       json_end(422, ['success' => false, 'error' => 'Name and duration are required']);
     }
 
-    // usa newId() se existir no helpers, senão gera local
     if (!function_exists('newId')) {
       function newId() { return bin2hex(random_bytes(16)); }
     }
@@ -131,6 +136,5 @@ try {
   json_end(405, ['success' => false, 'error' => 'Unsupported method']);
 } catch (Throwable $e) {
   error_log("services/index error: " . $e->getMessage());
-  // Não derruba o front; responde estrutura válida
-  json_end(200, ['success' => true, 'data' => []]);
+  json_end(500, ['success' => false, 'error' => 'Internal server error']);
 }

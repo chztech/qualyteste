@@ -1,67 +1,142 @@
 <?php
 require_once '../config/cors.php';
+require_once '../config/database.php';
 require_once '../helpers/functions.php';
 
-if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'PATCH'])) {
-    jsonResponse(false, null, 405, 'Method not allowed');
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if ($method === 'OPTIONS') {
+    http_response_code(200);
+    exit;
 }
 
-requireAuth();
-$database = new Database();
-$db = $database->getConnection();
-
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = $_POST;
-}
-
-$id = isset($data['id']) ? trim($data['id']) : '';
-if ($id === '') {
-    jsonResponse(false, null, 422, 'Appointment id is required');
+if (!in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
+    jsonResponse(false, null, 405, 'Método não permitido');
 }
 
 try {
-    $fields = [];
-    $values = [];
+    $db = (new Database())->getConnection();
+    $auth = requireAuth();
 
-    $map = [
-        'date' => 'date',
-        'startTime' => 'start_time',
-        'endTime' => 'end_time',
-        'status' => 'status',
-        'notes' => 'notes',
-        'companyId' => 'company_id',
-        'providerId' => 'provider_id',
-        'employeeId' => 'employee_id',
-        'serviceId' => 'service_id',
-        'clientId' => 'client_id'
-    ];
+    $rawBody = file_get_contents('php://input');
+    $body = json_decode($rawBody, true);
+    if (!is_array($body)) {
+        $body = $_POST; // fallback para application/x-www-form-urlencoded
+    }
 
-    foreach ($map as $inputKey => $column) {
-        if (isset($data[$inputKey])) {
-            $value = is_string($data[$inputKey]) ? trim($data[$inputKey]) : $data[$inputKey];
-            $fields[] = $column . ' = ?';
-            $values[] = $value === '' ? null : $value;
+    $id = isset($body['id']) ? trim((string)$body['id']) : '';
+    if ($id === '') {
+        jsonResponse(false, null, 422, 'id é obrigatório');
+    }
+
+    $stmt = $db->prepare('SELECT id, company_id, provider_id FROM appointments WHERE id = ? LIMIT 1');
+    $stmt->execute([$id]);
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$appointment) {
+        jsonResponse(false, null, 404, 'Agendamento não encontrado');
+    }
+
+    $role = $auth['role'] ?? null;
+    $allowedFields = [];
+    $providerIdFromUser = null;
+
+    if ($role === 'admin') {
+        $allowedFields = [
+            'date',
+            'start_time',
+            'end_time',
+            'duration',
+            'status',
+            'notes',
+            'company_id',
+            'employee_id',
+            'provider_id',
+            'client_id',
+            'service_id',
+            'service_name',
+        ];
+    } elseif ($role === 'company') {
+        $companyId = $auth['company_id'] ?? null;
+        if (!$companyId || $companyId !== $appointment['company_id']) {
+            jsonResponse(false, null, 403, 'Sem permissão para atualizar este agendamento');
         }
+        $allowedFields = ['status', 'notes', 'employee_id', 'service_id'];
+    } elseif ($role === 'provider') {
+        $userId = $auth['user_id'] ?? null;
+        if (!$userId) {
+            jsonResponse(false, null, 403, 'Sem permissão para atualizar este agendamento');
+        }
+        $providerLookup = $db->prepare('SELECT id FROM providers WHERE user_id = ? LIMIT 1');
+        $providerLookup->execute([$userId]);
+        $providerIdFromUser = $providerLookup->fetchColumn();
+        if (!$providerIdFromUser || $providerIdFromUser !== $appointment['provider_id']) {
+            jsonResponse(false, null, 403, 'Sem permissão para atualizar este agendamento');
+        }
+        $allowedFields = ['status', 'notes'];
+    } else {
+        jsonResponse(false, null, 403, 'Perfil sem autorização para atualizar agendamentos');
     }
 
-    if (isset($data['duration'])) {
-        $fields[] = 'duration = ?';
-        $values[] = (int) $data['duration'];
+    $allowedStatus = ['scheduled', 'confirmed', 'cancelled', 'completed'];
+    $setParts = [];
+    $params = [':id' => $id];
+
+    foreach ($allowedFields as $field) {
+        if (!array_key_exists($field, $body)) {
+            continue;
+        }
+
+        $value = $body[$field];
+
+        if ($field === 'status' && $value !== null && !in_array((string)$value, $allowedStatus, true)) {
+            jsonResponse(false, null, 422, 'Status inválido');
+        }
+
+        $setParts[] = "$field = :$field";
+        $params[":$field"] = $value;
     }
 
-    if (!$fields) {
-        jsonResponse(false, null, 400, 'No updatable fields provided');
+    if (!$setParts) {
+        jsonResponse(false, null, 400, 'Nenhum campo permitido para atualizar foi informado');
     }
 
-    $fields[] = 'updated_at = NOW()';
-    $values[] = $id;
+    $sql = 'UPDATE appointments SET ' . implode(', ', $setParts) . ', updated_at = NOW() WHERE id = :id';
+    if ($role === 'company') {
+        $sql .= ' AND company_id = :company_filter';
+        $params[':company_filter'] = $appointment['company_id'];
+    } elseif ($role === 'provider') {
+        $sql .= ' AND provider_id = :provider_filter';
+        $params[':provider_filter'] = $providerIdFromUser;
+    }
 
-    $stmt = $db->prepare('UPDATE appointments SET ' . implode(', ', $fields) . ' WHERE id = ?');
-    $stmt->execute($values);
+    $update = $db->prepare($sql);
+    $update->execute($params);
 
-    jsonResponse(true, ['id' => $id]);
-} catch (PDOException $exception) {
-    jsonResponse(false, null, 500, 'Failed to update appointment: ' . $exception->getMessage());
+    $select = $db->prepare('
+        SELECT
+            id,
+            company_id,
+            employee_id,
+            provider_id,
+            client_id,
+            service_id,
+            date,
+            start_time,
+            end_time,
+            duration,
+            status,
+            service_name,
+            notes,
+            created_at,
+            updated_at
+        FROM appointments
+        WHERE id = ?
+        LIMIT 1
+    ');
+    $select->execute([$id]);
+    $updated = $select->fetch(PDO::FETCH_ASSOC);
+
+    jsonResponse(true, $updated, 200);
+} catch (Throwable $e) {
+    error_log('update appointments error: ' . $e->getMessage());
+    jsonResponse(false, null, 500, 'Falha ao atualizar agendamento');
 }

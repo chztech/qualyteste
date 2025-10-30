@@ -2,6 +2,12 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../config/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/functions.php';
+
+$auth = requireAuth();
+if (($auth['role'] ?? '') !== 'admin') {
+  json_end(403, ['success' => false, 'error' => 'Forbidden']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   json_end(405, ['success' => false, 'error' => 'Method not allowed']);
