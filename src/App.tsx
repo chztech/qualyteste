@@ -172,6 +172,15 @@ function App() {
       .padStart(2, "0")}`;
   };
 
+  const sanitizeClientId = (value?: string | null) => {
+    if (typeof value !== "string") {
+      return value ?? null;
+    }
+
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
   // ðŸŽ¯ Identificar pÃ¡gina pÃºblica
   const isPublicBookingPage = React.useCallback(() => {
     try {
@@ -422,16 +431,23 @@ function App() {
     appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
   ) => {
     try {
+      const normalizedClientId = sanitizeClientId(appointmentData.clientId ?? null);
+
       if (selectedAppointment) {
+        const updatePayload: Partial<Appointment> = {
+          ...appointmentData,
+          clientId: normalizedClientId,
+        };
+
         await apiService.updateAppointment(
           selectedAppointment.id,
-          appointmentData
+          updatePayload
         );
       } else {
         await apiService.createAppointment({
           companyId: appointmentData.companyId,
           providerId: appointmentData.providerId,
-          clientId: appointmentData.clientId,
+          clientId: normalizedClientId,
           employeeId: appointmentData.employeeId ?? null,
           serviceId: appointmentData.serviceId,
           date: appointmentData.date,
@@ -459,7 +475,15 @@ function App() {
     appointmentData: Partial<Appointment>
   ) => {
     try {
-      await apiService.updateAppointment(id, appointmentData);
+      const normalizedPayload: Partial<Appointment> = { ...appointmentData };
+
+      if (Object.prototype.hasOwnProperty.call(appointmentData, "clientId")) {
+        normalizedPayload.clientId = sanitizeClientId(
+          appointmentData.clientId ?? null
+        );
+      }
+
+      await apiService.updateAppointment(id, normalizedPayload);
       await loadInitialData();
     } catch (error) {
       console.error("Erro ao atualizar agendamento:", error);
@@ -484,7 +508,17 @@ function App() {
   ) => {
     try {
       await Promise.all(
-        appointmentIds.map((id) => apiService.updateAppointment(id, updateData))
+        appointmentIds.map((id) => {
+          const normalizedPayload: Partial<Appointment> = { ...updateData };
+
+          if (Object.prototype.hasOwnProperty.call(updateData, "clientId")) {
+            normalizedPayload.clientId = sanitizeClientId(
+              updateData.clientId ?? null
+            );
+          }
+
+          return apiService.updateAppointment(id, normalizedPayload);
+        })
       );
       await loadInitialData();
     } catch (error) {
@@ -522,7 +556,7 @@ function App() {
             companyId,
             providerId: slot.providerId,
             serviceId: slot.serviceId,
-            clientId: companyId,
+            clientId: null,
             employeeId: null,
             date,
             startTime: slot.time,
@@ -559,10 +593,11 @@ const handleCompanyBookAppointment = async (
     if (!appointmentData.startTime) throw new Error('HorÃ¡rio Ã© obrigatÃ³rio');
     
     // Criar agendamento
+    const normalizedClientId = sanitizeClientId(appointmentData.clientId ?? null);
     const response = await apiService.createAppointment({
       companyId: appointmentData.companyId,
       providerId: appointmentData.providerId,
-      clientId: appointmentData.clientId || appointmentData.companyId,
+      clientId: normalizedClientId,
       employeeId: appointmentData.employeeId || null,
       serviceId: appointmentData.serviceId,
       date: appointmentData.date,
