@@ -87,6 +87,17 @@ export default function PublicBooking({
     department: "",
   });
 
+  const normalizeId = React.useCallback((value: unknown): string | null => {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    const str = String(value).trim();
+    if (str === "" || str.toLowerCase() === "null" || str.toLowerCase() === "undefined") {
+      return null;
+    }
+    return str;
+  }, []);
+
   // --- Empresa pelo token (sem login) ---
   const companyId = useMemo(
     () => decodeCompanyId(companyToken),
@@ -103,6 +114,11 @@ export default function PublicBooking({
       ),
     [companies, companyId, companyToken]
   );
+
+  const normalizedCompanyId = useMemo(() => {
+    const fallback = normalizeId(companyId ?? null) ?? normalizeId(companyToken);
+    return normalizeId(company?.id ?? fallback);
+  }, [company, companyId, companyToken, normalizeId]);
 
   // --- helpers turno ---
   const getShiftFromTime = (
@@ -155,12 +171,17 @@ export default function PublicBooking({
 
   // --- Slots disponíveis com base nas props (sem chamadas protegidas) ---
   const availableSlots = useMemo<AvailableSlot[]>(() => {
-    if (!company) return [];
+    if (!company || !normalizedCompanyId) return [];
 
     const companySlots = appointments.filter((apt) => {
-      const isCompanySlot = apt.companyId === company.id;
-      const isAvailable = !apt.employeeId || apt.employeeId === "";
-      const isFuture = !isDateTimePast(apt.date, apt.startTime);
+      const slotCompanyId = normalizeId((apt as any).companyId ?? (apt as any).company_id ?? null);
+      const isCompanySlot = slotCompanyId === normalizedCompanyId;
+
+      const employeeIdentifier = normalizeId((apt as any).employeeId ?? (apt as any).employee_id ?? null);
+      const isAvailable = !employeeIdentifier;
+
+      const startTime = typeof apt.startTime === "string" ? apt.startTime.slice(0, 5) : "";
+      const isFuture = !isDateTimePast(apt.date, startTime);
       const isOpenStatus =
         (apt.status as string) === "scheduled" ||
         (apt.status as string) === "confirmed";
@@ -174,9 +195,10 @@ export default function PublicBooking({
           (apt as any).serviceName ||
           services.find((s) => s.id === apt.serviceId)?.name ||
           "Serviço";
+        const startTime = typeof apt.startTime === "string" ? apt.startTime.slice(0, 5) : "";
         return {
           date: apt.date,
-          time: apt.startTime,
+          time: startTime,
           serviceName,
           provider,
           duration: Number(apt.duration || 0),
@@ -188,7 +210,7 @@ export default function PublicBooking({
           ? a.time.localeCompare(b.time)
           : a.date.localeCompare(b.date)
       );
-  }, [appointments, company, providers, services]);
+  }, [appointments, company, normalizedCompanyId, normalizeId, providers, services]);
 
   // --- Datas disponíveis (com contagem por turno) ---
   const availableDates = useMemo<DateInfo[]>(() => {
