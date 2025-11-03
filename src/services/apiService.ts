@@ -344,7 +344,12 @@ class ApiService {
     if (response.success && Array.isArray(response.data)) {
       return {
         ...response,
-        data: response.data.map((record: any) => this.mapProvider(record)),
+        data: response.data.map((record: any) =>
+          this.mapProvider({
+            ...record,
+            user_id: record.userId ?? record.user_id ?? null,
+          })
+        ),
       } as ApiResponse<Provider[]>;
     }
 
