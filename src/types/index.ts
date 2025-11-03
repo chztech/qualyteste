@@ -52,6 +52,7 @@ export interface ProviderBreak {
 export interface Provider {
   id: string;
   userId?: string | null;
+  userId?: string | null;
   name: string;
   email: string;
   phone?: string | null;
