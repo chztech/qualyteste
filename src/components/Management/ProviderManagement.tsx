@@ -14,7 +14,8 @@ export default function ProviderManagement({
   providers,
   onAddProvider,
   onUpdateProvider,
-  onDeleteProvider
+  onDeleteProvider,
+  onChangeProviderPassword,
 }: ProviderManagementProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
