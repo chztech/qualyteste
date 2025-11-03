@@ -218,6 +218,7 @@ class ApiService {
       phone: record.phone ?? null,
       role: record.role ?? "client",
       companyId: record.companyId ?? record.company_id ?? null,
+      providerId: record.providerId ?? record.provider_id ?? null,
       isActive: record.isActive ?? record.is_active ?? true,
       createdAt: record.createdAt ?? record.created_at,
       updatedAt: record.updatedAt ?? record.updated_at,
