@@ -5,6 +5,7 @@ export interface User {
   phone?: string | null;
   role: 'admin' | 'client' | 'provider' | 'company';
   companyId?: string | null;
+  providerId?: string | null;
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -51,7 +52,6 @@ export interface ProviderBreak {
 
 export interface Provider {
   id: string;
-  userId?: string | null;
   userId?: string | null;
   name: string;
   email: string;
