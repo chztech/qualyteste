@@ -321,7 +321,7 @@ function App() {
 
     const intervalId = window.setInterval(() => {
       void syncData();
-    }, 60000);
+    }, 90000);
 
     void syncData();
 
@@ -1411,4 +1411,5 @@ const handleCompanyBookAppointment = async (
 }
 
 export default App;
+
 
