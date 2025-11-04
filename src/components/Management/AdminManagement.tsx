@@ -58,18 +58,23 @@ export default function AdminManagement({
     resetForm();
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!selectedAdminForPassword || !newPassword) {
       alert('Por favor, digite uma nova senha.');
       return;
     }
 
-    // Simular alteração de senha
-    alert(`Senha alterada com sucesso para ${selectedAdminForPassword.name}!\n\nNova senha: ${newPassword}\n\nAnote esta senha para fornecer ao administrador.`);
-    
-    setIsPasswordModalOpen(false);
-    setSelectedAdminForPassword(null);
-    setNewPassword('');
+    try {
+      await onUpdateAdmin(selectedAdminForPassword.id, { password: newPassword });
+      alert(`Senha alterada com sucesso para ${selectedAdminForPassword.name}!`);
+    } catch (error) {
+      console.error('Erro ao alterar senha do administrador:', error);
+      alert('Não foi possível alterar a senha. Tente novamente.');
+    } finally {
+      setIsPasswordModalOpen(false);
+      setSelectedAdminForPassword(null);
+      setNewPassword('');
+    }
   };
 
   const handleDeleteConfirm = () => {
