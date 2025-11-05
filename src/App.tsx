@@ -67,8 +67,13 @@ function App() {
   );
 
   const loadInitialData = React.useCallback(
-    async (roleOverride?: User["role"]) => {
-      setIsBootstrapping(true);
+    async (options?: { roleOverride?: User["role"]; silent?: boolean }) => {
+      const roleOverride = options?.roleOverride;
+      const silent = options?.silent ?? false;
+
+      if (!silent) {
+        setIsBootstrapping(true);
+      }
       setDataError(null);
       try {
         const effectiveRole = roleOverride ?? currentUser?.role;
@@ -167,7 +172,9 @@ function App() {
         console.error("Erro ao carregar dados iniciais:", error);
         setDataError("N�o foi poss�vel carregar os dados do sistema.");
       } finally {
-        setIsBootstrapping(false);
+        if (!silent) {
+          setIsBootstrapping(false);
+        }
       }
     },
     [currentUser?.role]
@@ -304,7 +311,7 @@ function App() {
       if (isSyncing) return;
       isSyncing = true;
       try {
-        await loadInitialData();
+        await loadInitialData({ roleOverride: currentUser?.role, silent: true });
       } finally {
         isSyncing = false;
       }
@@ -321,7 +328,7 @@ function App() {
 
     const intervalId = window.setInterval(() => {
       void syncData();
-    }, 90000);
+    }, 15000);
 
     void syncData();
 
@@ -330,7 +337,7 @@ function App() {
       document.removeEventListener("visibilitychange", handleFocus);
       window.clearInterval(intervalId);
     };
-  }, [isAuthenticated, loadInitialData]);
+  }, [isAuthenticated, currentUser?.role, loadInitialData]);
 
   // Employee management functions for companies
   const handleAddEmployee = async (employeeData: Omit<Employee, "id">) => {
@@ -348,7 +355,7 @@ function App() {
       await apiService.updateCompany(employeeData.companyId, {
         employees: [...company.employees, newEmployee],
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao adicionar colaborador:", error);
       alert("Não foi possível adicionar o colaborador. Tente novamente.");
@@ -372,7 +379,7 @@ function App() {
       await apiService.updateCompany(company.id, {
         employees: updatedEmployees,
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar colaborador:", error);
       alert("Não foi possível atualizar o colaborador. Tente novamente.");
@@ -397,7 +404,7 @@ function App() {
       await apiService.updateCompany(company.id, {
         employees: updatedEmployees,
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir colaborador:", error);
       alert("Não foi possível excluir o colaborador. Tente novamente.");
@@ -413,7 +420,7 @@ function App() {
         const { user, token } = response.data;
 
         apiService.setAuthToken(token);
-        await loadInitialData(user.role);
+        await loadInitialData({ roleOverride: user.role });
 
         const mappedUser: User = {
           id: user.id,
@@ -536,7 +543,7 @@ function App() {
         });
       }
 
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao salvar agendamento:", error);
       alert("Não foi possível salvar o agendamento. Tente novamente.");
@@ -561,7 +568,7 @@ function App() {
       }
 
       await apiService.updateAppointment(id, normalizedPayload);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar agendamento:", error);
       alert("Não foi possível atualizar o agendamento. Tente novamente.");
@@ -571,7 +578,7 @@ function App() {
   const handleDeleteAppointment = async (id: string) => {
     try {
       await apiService.deleteAppointments([id]);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir agendamento:", error);
       alert("Não foi possível excluir o agendamento. Tente novamente.");
@@ -597,7 +604,7 @@ function App() {
           return apiService.updateAppointment(id, normalizedPayload);
         })
       );
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar agendamentos:", error);
       alert("Não foi possível atualizar os agendamentos selecionados.");
@@ -610,7 +617,7 @@ function App() {
 
     try {
       await apiService.deleteAppointments(appointmentIds);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir agendamentos:", error);
       alert("Não foi possível excluir os agendamentos selecionados.");
@@ -647,7 +654,7 @@ function App() {
           });
         })
       );
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao criar agendamentos:", error);
       alert("Não foi possível criar os agendamentos. Tente novamente.");
@@ -805,7 +812,7 @@ const handleCompanyBookAppointment = async (
         breaks: providerData.breaks ?? [],
         createUser: true,
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao cadastrar prestador:", error);
       alert("Não foi possível cadastrar o prestador. Tente novamente.");
@@ -818,7 +825,7 @@ const handleCompanyBookAppointment = async (
   ) => {
     try {
       await apiService.updateProvider(id, providerData);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar prestador:", error);
       alert("Não foi possível atualizar o prestador. Tente novamente.");
@@ -832,7 +839,7 @@ const handleCompanyBookAppointment = async (
 
     try {
       await apiService.updateProvider(id, { isActive: false });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir prestador:", error);
       alert("Não foi possível excluir o prestador. Tente novamente.");
@@ -848,7 +855,7 @@ const handleCompanyBookAppointment = async (
       const res = await apiService.updateProviderPassword(providerId, password);
       if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
       alert("Senha do prestador alterada com sucesso!");
-      await loadInitialData(currentUser?.role);
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao alterar senha do prestador:", error);
       alert("Não foi possível alterar a senha do prestador. Tente novamente.");
@@ -891,7 +898,7 @@ const handleCompanyBookAppointment = async (
         });
       }
 
-      await loadInitialData(currentUser?.role);
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao cadastrar empresa:", error);
       alert("Não foi possível cadastrar a empresa. Tente novamente.");
@@ -904,7 +911,7 @@ const handleCompanyBookAppointment = async (
   ) => {
     try {
       await apiService.updateCompany(id, companyData);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar empresa:", error);
       alert("Não foi possível atualizar a empresa. Tente novamente.");
@@ -918,7 +925,7 @@ const handleCompanyBookAppointment = async (
 
     try {
       await apiService.updateCompany(id, { isActive: false });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir empresa:", error);
       alert("Não foi possível excluir a empresa. Tente novamente.");
@@ -934,7 +941,7 @@ const handleCompanyBookAppointment = async (
       const res = await apiService.changeCompanyPassword(companyId, password);
       if (!res.success) throw new Error(res.error || "Falha ao alterar senha");
       alert("Senha alterada com sucesso!");
-      await loadInitialData(currentUser?.role);
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao alterar senha da empresa:", error);
       alert("Não foi possível alterar a senha. Tente novamente.");
@@ -952,7 +959,7 @@ const handleCompanyBookAppointment = async (
         description: serviceData.description ?? undefined,
         price: serviceData.price ?? null,
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao cadastrar serviço:", error);
       alert("Não foi possível cadastrar o serviço. Tente novamente.");
@@ -965,7 +972,7 @@ const handleCompanyBookAppointment = async (
   ) => {
     try {
       await apiService.updateService(id, serviceData);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar serviço:", error);
       alert("Não foi possível atualizar o serviço. Tente novamente.");
@@ -979,7 +986,7 @@ const handleCompanyBookAppointment = async (
 
     try {
       await apiService.deleteService(id);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir serviço:", error);
       alert("Não foi possível excluir o serviço. Tente novamente.");
@@ -1000,7 +1007,7 @@ const handleCompanyBookAppointment = async (
         password: adminData.password,
         role: "admin",
       });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao cadastrar administrador:", error);
       alert("Não foi possível cadastrar o administrador. Tente novamente.");
@@ -1013,7 +1020,7 @@ const handleCompanyBookAppointment = async (
   ) => {
     try {
       await apiService.updateUser(id, adminData);
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao atualizar administrador:", error);
       alert("Não foi possível atualizar o administrador. Tente novamente.");
@@ -1027,7 +1034,7 @@ const handleCompanyBookAppointment = async (
 
     try {
       await apiService.updateUser(id, { isActive: false });
-      await loadInitialData();
+      await loadInitialData({ roleOverride: currentUser?.role });
     } catch (error) {
       console.error("Erro ao excluir administrador:", error);
       alert("Não foi possível excluir o administrador. Tente novamente.");
@@ -1411,5 +1418,3 @@ const handleCompanyBookAppointment = async (
 }
 
 export default App;
-
-
