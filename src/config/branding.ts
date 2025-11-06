@@ -46,7 +46,7 @@ export const brandingConfig = {
       backgroundColor: 'transparent', // Cor de fundo
       borderRadius: 'rounded-lg',   // Bordas arredondadas
       padding: 'p-0',         // Espaçamento interno
-      showBackground: true,    // Mostrar fundo colorido
+      showBackground: false,    // Mostrar fundo colorido
     },
     // Configurações da logo no link público
     public: {
@@ -56,7 +56,7 @@ export const brandingConfig = {
       backgroundColor: 'transparent',
       borderRadius: 'rounded-xl',
       padding: 'p-0',
-      showBackground: true,
+      showBackground: false,
     }
   },
   
