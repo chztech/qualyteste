@@ -26,21 +26,21 @@ interface LogoCustomizationProps {
 const DEFAULTS: LogoCustomizationPayload = {
   login: {
     imageUrl: "/logo_qualy.png",
-    width: 80,
+    width: 160,
     height: 80,
-    backgroundColor: "blue-600",
+    backgroundColor: "transparent",
     borderRadius: "rounded-lg",
-    padding: "p-4",
-    showBackground: true,
+    padding: "p-0",
+    showBackground: false,
   },
   public: {
     imageUrl: "/logo_qualy.png",
-    width: 100,
-    height: 100,
-    backgroundColor: "blue-600",
+    width: 160,
+    height: 90,
+    backgroundColor: "transparent",
     borderRadius: "rounded-xl",
-    padding: "p-6",
-    showBackground: true,
+    padding: "p-0",
+    showBackground: false,
   },
 };
 
