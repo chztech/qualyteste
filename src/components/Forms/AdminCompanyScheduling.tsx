@@ -401,7 +401,7 @@ export default function AdminCompanyScheduling({
                   </div>
                 </div>
 
-                {/* DuraÃ§Ã£o */}
+                {/* Duração */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ Duração</label>
                   <div className="grid grid-cols-4 gap-2">
@@ -569,7 +569,7 @@ export default function AdminCompanyScheduling({
                       </div>
                       
                       <div className="mt-2 text-xs opacity-75">
-                        DuraÃ§Ã£o: {Math.round((timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime)))} minutos
+                        Duração: {Math.round((timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime)))} minutos
                       </div>
                     </div>
                   ))}
