@@ -21,7 +21,7 @@ export default function AdminCompanyScheduling({
   services,
   availableTimeSlots
 }: AdminCompanySchedulingProps) {
-  // Dados do formulário - TUDO EM UMA TELA
+  // Dados do formulÃ¡rio - TUDO EM UMA TELA
   const [formData, setFormData] = useState({
     companyId: '',
     date: '',
@@ -53,7 +53,7 @@ export default function AdminCompanyScheduling({
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   };
 
-  // FUNÇÃO SIMPLIFICADA: Gerar grade automaticamente
+  // FUNÃ‡ÃƒO SIMPLIFICADA: Gerar grade automaticamente
   const generateSlots = () => {
     const slots = [];
     const startMinutes = timeToMinutes(formData.startTime);
@@ -93,9 +93,9 @@ export default function AdminCompanyScheduling({
   // Adicionar pausa
   const addBreak = (type: 'lunch' | 'coffee' | 'meeting' | 'rest' | 'custom') => {
     const breakDefaults = {
-      lunch: { name: 'Almoço', startTime: '12:00', endTime: '13:00' },
+      lunch: { name: 'AlmoÃ§o', startTime: '12:00', endTime: '13:00' },
       coffee: { name: 'Lanche', startTime: '15:00', endTime: '15:15' },
-      meeting: { name: 'Reunião', startTime: '14:00', endTime: '14:30' },
+      meeting: { name: 'ReuniÃ£o', startTime: '14:00', endTime: '14:30' },
       rest: { name: 'Descanso', startTime: '10:00', endTime: '10:15' },
       custom: { name: 'Pausa Personalizada', startTime: '16:00', endTime: '16:30' }
     };
@@ -130,14 +130,14 @@ export default function AdminCompanyScheduling({
     }));
   };
 
-  // Obter ícone da pausa
+  // Obter Ã­cone da pausa
   const getBreakIcon = (type: string) => {
     switch (type) {
-      case 'lunch': return '🍽️';
-      case 'coffee': return '☕';
-      case 'meeting': return '👥';
-      case 'rest': return '😴';
-      default: return '⏸️';
+      case 'lunch': return 'ðŸ½ï¸';
+      case 'coffee': return 'â˜•';
+      case 'meeting': return 'ðŸ‘¥';
+      case 'rest': return 'ðŸ˜´';
+      default: return 'â¸ï¸';
     }
   };
 
@@ -218,7 +218,7 @@ export default function AdminCompanyScheduling({
       
       onSubmit(scheduleData);
       
-      alert(`✅ Agendamento criado com sucesso!\n\n📊 Resumo:\n• ${slots.length} horários diferentes\n• ${formData.chairs} cadeira(s) por horário\n• ${allAppointments.length} slots totais criados\n• ${formData.selectedProviders.length} prestadores distribuídos\n\n🎯 Cada horário tem ${formData.chairs} vaga(s) disponível(is)!`);
+      alert(`✅ Agendamento criado com sucesso!\n\n📊 Resumo:\n• ${slots.length} horários diferentes\n• ${formData.chairs} cadeira(s) por horário\n• ${allAppointments.length} slots totais criados\n• ${formData.selectedProviders.length} prestadores distribuídos\n\n🎯 Cada horário tem ${formData.chairs} vaga(s) disponível(is)!!`);
       
       handleClose();
     } catch (error) {
@@ -229,7 +229,7 @@ export default function AdminCompanyScheduling({
     }
   };
 
-  // Função para determinar o turno baseado no horário
+  // FunÃ§Ã£o para determinar o turno baseado no horÃ¡rio
   const getShiftFromTime = (time: string): string => {
     const hour = parseInt(time.split(':')[0]);
     
@@ -279,7 +279,7 @@ export default function AdminCompanyScheduling({
           </button>
         </div>
 
-        {/* Formulário Único */}
+        {/* FormulÃ¡rio Ãšnico */}
         <div className="p-6 overflow-y-auto max-h-[calc(95vh-140px)]">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Coluna 1: Configurações Básicas */}
@@ -319,7 +319,7 @@ export default function AdminCompanyScheduling({
                 />
               </div>
 
-              {/* 3. Horários */}
+              {/* 3. HorÃ¡rios */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -349,9 +349,33 @@ export default function AdminCompanyScheduling({
                     ))}
                   </select>
                 </div>
+              
+                <div className="mt-3">
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Numero personalizado de cadeiras (1-20)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    step={1}
+                    value={formData.chairs}
+                    onChange={(e) => {
+                      const parsed = Number(e.target.value);
+                      if (Number.isNaN(parsed)) return;
+                      const clamped = Math.min(20, Math.max(1, parsed));
+                      setFormData({...formData, chairs: clamped});
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm"
+                    placeholder="Ex: 6, 8..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ajuste quando precisar de mais ou menos posicoes por horario.
+                  </p>
+                </div>
               </div>
 
-              {/* 4. Configuração Rápida */}
+              {/* 4. ConfiguraÃ§Ã£o RÃ¡pida */}
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                 <h3 className="font-medium text-purple-900 mb-4">⚡ Configuração Rápida</h3>
                 
@@ -377,7 +401,7 @@ export default function AdminCompanyScheduling({
                   </div>
                 </div>
 
-                {/* Duração */}
+                {/* DuraÃ§Ã£o */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">⏱️ Duração</label>
                   <div className="grid grid-cols-4 gap-2">
@@ -410,7 +434,7 @@ export default function AdminCompanyScheduling({
                       placeholder="Ex: 25, 45, 90..."
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      💡 Dica: Use múltiplos de 5 para melhor organização (5, 10, 15, 20...)
+                      💡 Dica: Use multuplos de 5 para melhor organização (5, 10, 15, 20...)
                     </p>
                   </div>
                   <input
@@ -425,7 +449,7 @@ export default function AdminCompanyScheduling({
                   />
                 </div>
 
-                {/* Serviço */}
+                {/* ServiÃ§o */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">💆 Serviço</label>
                   <select
@@ -465,9 +489,9 @@ export default function AdminCompanyScheduling({
                       type="button"
                       onClick={() => addBreak('meeting')}
                       className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                      title="Adicionar Reunião"
+                      title="Adicionar ReuniÃ£o"
                     >
-                      👥
+                       👥
                     </button>
                     <button
                       type="button"
@@ -475,7 +499,7 @@ export default function AdminCompanyScheduling({
                       className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
                       title="Adicionar Descanso"
                     >
-                      😴
+                     😴️
                     </button>
                     <button
                       type="button"
@@ -515,7 +539,7 @@ export default function AdminCompanyScheduling({
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-xs font-medium mb-1">Início</label>
+                          <label className="block text-xs font-medium mb-1">Iní­cio</label>
                           <select
                             value={breakItem.startTime}
                             onChange={(e) => updateBreak(breakItem.id, 'startTime', e.target.value)}
@@ -545,7 +569,7 @@ export default function AdminCompanyScheduling({
                       </div>
                       
                       <div className="mt-2 text-xs opacity-75">
-                        Duração: {Math.round((timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime)))} minutos
+                        DuraÃ§Ã£o: {Math.round((timeToMinutes(breakItem.endTime) - timeToMinutes(breakItem.startTime)))} minutos
                       </div>
                     </div>
                   ))}
@@ -565,7 +589,7 @@ export default function AdminCompanyScheduling({
               {/* 6. Prestadores */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  👨‍⚕️ Prestadores * ({formData.selectedProviders.length} selecionados)
+                  ðŸ‘¨â€âš•ï¸ Prestadores * ({formData.selectedProviders.length} selecionados)
                 </label>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {providers.map(provider => (
@@ -615,12 +639,12 @@ export default function AdminCompanyScheduling({
                         <p className="text-blue-900">{new Date(formData.date).toLocaleDateString('pt-BR')}</p>
                       </div>
                       <div className="bg-white p-2 rounded border">
-                        <p className="text-blue-600 font-medium">Período</p>
+                        <p className="text-blue-600 font-medium">PerÃ­odo</p>
                         <p className="text-blue-900">{formData.startTime} - {formData.endTime}</p>
                       </div>
                       <div className="bg-white p-2 rounded border">
                         <p className="text-blue-600 font-medium">Configuração</p>
-                        <p className="text-blue-900">{formData.chairs} cadeiras • {formData.duration}min</p>
+                        <p className="text-blue-900">{formData.chairs} cadeiras â€¢ {formData.duration}min</p>
                       </div>
                     </div>
 
@@ -629,19 +653,19 @@ export default function AdminCompanyScheduling({
                       <div className="text-green-800 text-sm space-y-1">
                         <div>🕐 <strong>{slots.length}</strong> horários gerados</div>
                         <div>🪑 <strong>{formData.chairs}</strong> cadeira{formData.chairs > 1 ? 's' : ''} por horário</div>
-                        <div>📋 <strong>{totalAppointments}</strong> agendamentos totais</div>
-                        <div>👨‍⚕️ <strong>{formData.selectedProviders.length}</strong> prestador{formData.selectedProviders.length > 1 ? 'es' : ''}</div>
-                        <div>⏸️ <strong>{formData.breaks.length}</strong> pausa{formData.breaks.length !== 1 ? 's' : ''}</div>
+                        <div>📋<strong>{totalAppointments}</strong> agendamentos totais</div>
+                        <div>👨‍⚕️<strong>{formData.selectedProviders.length}</strong> prestador{formData.selectedProviders.length > 1 ? 'es' : ''}</div>
+                        <div>⏸️<strong>{formData.breaks.length}</strong> pausa{formData.breaks.length !== 1 ? 's' : ''}</div>
                         {formData.selectedProviders.length > 0 && (
                           <div>📈 <strong>{Math.ceil(totalAppointments / formData.selectedProviders.length)}</strong> agendamentos por prestador</div>
                         )}
                       </div>
                     </div>
 
-                    {/* Preview dos Horários */}
+                    {/* Preview dos HorÃ¡rios */}
                     {slots.length > 0 && (
                       <div className="bg-white p-3 rounded border max-h-32 overflow-y-auto">
-                        <h4 className="font-medium text-gray-900 mb-2">🕐 Horários Gerados:</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">ðŸ• HorÃ¡rios Gerados:</h4>
                         <div className="grid grid-cols-3 gap-1 text-xs">
                           {slots.slice(0, 12).map((slot, index) => (
                             <div key={index} className="bg-gray-100 p-1 rounded text-center">
@@ -717,3 +741,8 @@ export default function AdminCompanyScheduling({
     </div>
   );
 }
+
+
+
+
+
