@@ -93,9 +93,9 @@ export default function AdminCompanyScheduling({
   // Adicionar pausa
   const addBreak = (type: 'lunch' | 'coffee' | 'meeting' | 'rest' | 'custom') => {
     const breakDefaults = {
-      lunch: { name: 'AlmoÃ§o', startTime: '12:00', endTime: '13:00' },
+      lunch: { name: 'Almoço', startTime: '12:00', endTime: '13:00' },
       coffee: { name: 'Lanche', startTime: '15:00', endTime: '15:15' },
-      meeting: { name: 'ReuniÃ£o', startTime: '14:00', endTime: '14:30' },
+      meeting: { name: 'Reunião', startTime: '14:00', endTime: '14:30' },
       rest: { name: 'Descanso', startTime: '10:00', endTime: '10:15' },
       custom: { name: 'Pausa Personalizada', startTime: '16:00', endTime: '16:30' }
     };
@@ -133,11 +133,11 @@ export default function AdminCompanyScheduling({
   // Obter Ã­cone da pausa
   const getBreakIcon = (type: string) => {
     switch (type) {
-      case 'lunch': return 'ðŸ½ï¸';
-      case 'coffee': return 'â˜•';
-      case 'meeting': return 'ðŸ‘¥';
-      case 'rest': return 'ðŸ˜´';
-      default: return 'â¸ï¸';
+      case 'lunch': return '🍽️';
+      case 'coffee': return '☕';
+      case 'meeting': return '👥';
+      case 'rest': return '😴';
+      default: return '⏸️';
     }
   };
 
@@ -319,7 +319,7 @@ export default function AdminCompanyScheduling({
                 />
               </div>
 
-              {/* 3. HorÃ¡rios */}
+              {/* 3. Horarios */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -375,7 +375,7 @@ export default function AdminCompanyScheduling({
                 </div>
               </div>
 
-              {/* 4. ConfiguraÃ§Ã£o RÃ¡pida */}
+              {/* 4. Configuração Rápida */}
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                 <h3 className="font-medium text-purple-900 mb-4">⚡ Configuração Rápida</h3>
                 
@@ -449,7 +449,7 @@ export default function AdminCompanyScheduling({
                   />
                 </div>
 
-                {/* ServiÃ§o */}
+                {/* Serviço */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">💆 Serviço</label>
                   <select
@@ -489,7 +489,7 @@ export default function AdminCompanyScheduling({
                       type="button"
                       onClick={() => addBreak('meeting')}
                       className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                      title="Adicionar ReuniÃ£o"
+                      title="Adicionar Reunião"
                     >
                        👥
                     </button>
@@ -589,7 +589,7 @@ export default function AdminCompanyScheduling({
               {/* 6. Prestadores */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  ðŸ‘¨â€âš•ï¸ Prestadores * ({formData.selectedProviders.length} selecionados)
+                  👨‍⚕️ Prestadores * ({formData.selectedProviders.length} selecionados)
                 </label>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {providers.map(provider => (
@@ -639,12 +639,12 @@ export default function AdminCompanyScheduling({
                         <p className="text-blue-900">{new Date(formData.date).toLocaleDateString('pt-BR')}</p>
                       </div>
                       <div className="bg-white p-2 rounded border">
-                        <p className="text-blue-600 font-medium">PerÃ­odo</p>
+                        <p className="text-blue-600 font-medium">Período</p>
                         <p className="text-blue-900">{formData.startTime} - {formData.endTime}</p>
                       </div>
                       <div className="bg-white p-2 rounded border">
                         <p className="text-blue-600 font-medium">Configuração</p>
-                        <p className="text-blue-900">{formData.chairs} cadeiras â€¢ {formData.duration}min</p>
+                        <p className="text-blue-900">{formData.chairs} cadeiras • {formData.duration}min</p>
                       </div>
                     </div>
 
@@ -665,7 +665,7 @@ export default function AdminCompanyScheduling({
                     {/* Preview dos HorÃ¡rios */}
                     {slots.length > 0 && (
                       <div className="bg-white p-3 rounded border max-h-32 overflow-y-auto">
-                        <h4 className="font-medium text-gray-900 mb-2">ðŸ• HorÃ¡rios Gerados:</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">🕐 Horários Gerados:</h4>
                         <div className="grid grid-cols-3 gap-1 text-xs">
                           {slots.slice(0, 12).map((slot, index) => (
                             <div key={index} className="bg-gray-100 p-1 rounded text-center">
