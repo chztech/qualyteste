@@ -41,21 +41,21 @@ export const brandingConfig = {
     // Configurações da logo na tela de login
     login: {
       imageUrl: '/logo_qualy.png',
-      width: 80,              // Largura em pixels
+      width: 160,              // Largura em pixels
       height: 80,             // Altura em pixels
-      backgroundColor: 'blue-600', // Cor de fundo
+      backgroundColor: 'transparent', // Cor de fundo
       borderRadius: 'rounded-lg',   // Bordas arredondadas
-      padding: 'p-4',         // Espaçamento interno
+      padding: 'p-0',         // Espaçamento interno
       showBackground: true,    // Mostrar fundo colorido
     },
     // Configurações da logo no link público
     public: {
       imageUrl: '/logo_qualy.png',
-      width: 100,
-      height: 100,
-      backgroundColor: 'blue-600',
+      width: 160,
+      height: 90,
+      backgroundColor: 'transparent',
       borderRadius: 'rounded-xl',
-      padding: 'p-6',
+      padding: 'p-0',
       showBackground: true,
     }
   },
@@ -89,7 +89,7 @@ export const brandingConfig = {
   seo: {
     title: 'QualyCorpore - Sistema de Agendamento de Massagem',
     description: 'Sistema completo para agendamento de massagens corporativas e individuais',
-    keywords: 'agendamento, massagem, corporativo',
+    keywords: 'agendamento, massagem em curitiba, corporativo',
     author: 'CHZTECH ASSESSORIA DIGITAL'
   }
 };
