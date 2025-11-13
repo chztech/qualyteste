@@ -241,7 +241,7 @@ export default function AdminDashboard({
         return formatDate(selectedDate, { 
           weekday: 'long', 
           day: '2-digit', 
-          month: 'long', 
+          month: '2-digit', 
           year: 'numeric' 
         });
       case 'week':
