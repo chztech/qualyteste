@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -66,6 +66,17 @@ export default function AdminDashboard({
   const [filterPeriod, setFilterPeriod] = useState<'day' | 'week' | 'month'>('day');
   const [selectedDate, setSelectedDate] = useState(getCurrentDateString());
   const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+
+  const employeeNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    companies.forEach((company) => {
+      company.employees.forEach((employee) => {
+        map.set(employee.id, employee.name);
+      });
+    });
+    return map;
+  }, [companies]);
   
   const [editData, setEditData] = useState({
     date: '',
@@ -265,6 +276,17 @@ export default function AdminDashboard({
     // Filtrar por empresa se selecionada
     if (selectedCompany) {
       filtered = filtered.filter(apt => apt.companyId === selectedCompany);
+    }
+
+    if (employeeSearch.trim()) {
+      const term = employeeSearch.trim().toLowerCase();
+      filtered = filtered.filter(apt => {
+        const employeeName =
+          employeeNameById.get(apt.employeeId ?? '') ??
+          apt.employeeName ??
+          '';
+        return employeeName.toLowerCase().includes(term);
+      });
     }
     
     return filtered.sort((a, b) => {
@@ -683,6 +705,14 @@ export default function AdminDashboard({
               ))}
             </select>
 
+            <input
+              type="text"
+              placeholder="Buscar colaborador"
+              value={employeeSearch}
+              onChange={(e) => setEmployeeSearch(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full sm:w-48"
+            />
+
             {/* Botão Hoje */}
             <button
               onClick={() => setSelectedDate(getCurrentDateString())}
@@ -908,9 +938,11 @@ export default function AdminDashboard({
               <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum agendamento encontrado</h3>
               <p className="text-gray-600">
-                {selectedCompany ? 
-                  'A empresa selecionada não possui agendamentos no período' :
-                  'Não há agendamentos no período selecionado'
+                {employeeSearch.trim()
+                  ? `Nenhum colaborador encontrado para "${employeeSearch}" no período selecionado`
+                  : selectedCompany
+                    ? 'A empresa selecionada não possui agendamentos no período'
+                    : 'Não há agendamentos no período selecionado'
                 }
               </p>
               <button
