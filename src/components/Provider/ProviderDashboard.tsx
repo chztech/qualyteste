@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Edit3, Save, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Calendar, Clock, CheckCircle, XCircle, AlertCircle, User, Edit3, Save, X, Phone } from 'lucide-react';
 import { Provider, Appointment, Company, Employee } from '../../types';
 import { formatDate, formatDateWithWeekday, getCurrentDateString, getWeekRange, getMonthRange, dateToInputString } from '../../utils/dateUtils';
 
@@ -22,6 +22,17 @@ export default function ProviderDashboard({
   const [viewMode, setViewMode] = useState<'today' | 'week' | 'all'>('today');
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [notesValue, setNotesValue] = useState('');
+  const [employeeSearch, setEmployeeSearch] = useState('');
+
+  const employeeNameById = useMemo(() => {
+    const map = new Map<string, { name: string; phone?: string | null }>();
+    companies.forEach(company => {
+      company.employees.forEach(employee => {
+        map.set(employee.id, { name: employee.name, phone: employee.phone });
+      });
+    });
+    return map;
+  }, [companies]);
 
   // 🎯 FUNÇÃO CORRIGIDA: Filtrar agendamentos do prestador
   const getProviderAppointments = () => {
@@ -36,27 +47,38 @@ export default function ProviderDashboard({
 
   // 🎯 FUNÇÃO CORRIGIDA: Filtrar agendamentos por período
   const getFilteredAppointments = () => {
-    const providerAppointments = getProviderAppointments();
+    let providerAppointments = getProviderAppointments();
     
     switch (viewMode) {
       case 'today':
-        return providerAppointments.filter(apt => apt.date === selectedDate);
+        providerAppointments = providerAppointments.filter(apt => apt.date === selectedDate);
+        break;
       case 'week':
         const { start: weekStart, end: weekEnd } = getWeekRange(selectedDate);
-        return providerAppointments.filter(apt => 
+        providerAppointments = providerAppointments.filter(apt => 
           apt.date >= weekStart && apt.date <= weekEnd
         );
+        break;
       case 'all':
-        return providerAppointments.sort((a, b) => {
-          // Primeiro por data, depois por horário
-          if (a.date !== b.date) {
-            return a.date.localeCompare(b.date);
-          }
-          return a.startTime.localeCompare(b.startTime);
-        });
       default:
-        return providerAppointments;
+        break;
     }
+
+    if (employeeSearch.trim()) {
+      const term = employeeSearch.trim().toLowerCase();
+      providerAppointments = providerAppointments.filter(apt => {
+        const matchedEmployee = employeeNameById.get(apt.employeeId ?? '');
+        const fallbackName = apt.employeeName ?? '';
+        return (matchedEmployee?.name ?? fallbackName).toLowerCase().includes(term);
+      });
+    }
+
+    return providerAppointments.sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date);
+      }
+      return a.startTime.localeCompare(b.startTime);
+    });
   };
 
   const getEmployeeInfo = (companyId?: string, employeeId?: string) => {
@@ -189,12 +211,12 @@ export default function ProviderDashboard({
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
+        <div className="p-6 border-b border-gray-200 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <h2 className="text-lg font-semibold text-gray-900">
               Minha Agenda ({filteredAppointments.length} agendamentos)
             </h2>
-            <div className="flex items-center space-x-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
               <input
                 type="date"
                 value={selectedDate}
@@ -210,6 +232,13 @@ export default function ProviderDashboard({
                 <option value="week">Esta Semana</option>
                 <option value="all">Todos</option>
               </select>
+              <input
+                type="text"
+                placeholder="Buscar colaborador"
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
           </div>
           
@@ -277,6 +306,12 @@ export default function ProviderDashboard({
                             <div className="text-xs text-gray-500">
                               {employeeInfo.company.name} - {employeeInfo.employee.department}
                             </div>
+                            {employeeInfo.employee.phone && (
+                              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                <Phone className="w-3 h-3" />
+                                <span>{employeeInfo.employee.phone}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                         {!employeeInfo && appointment.companyId && (
@@ -387,9 +422,13 @@ export default function ProviderDashboard({
                 <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">Nenhum agendamento encontrado para o período selecionado</p>
                 <p className="text-sm text-gray-400 mt-2">
-                  {viewMode === 'today' ? 'Tente selecionar outra data' : 
-                   viewMode === 'week' ? 'Tente selecionar outra semana' : 
-                   'Você ainda não possui agendamentos'}
+                  {employeeSearch.trim()
+                    ? `Sem resultados para "${employeeSearch}"`
+                    : viewMode === 'today'
+                      ? 'Tente selecionar outra data'
+                      : viewMode === 'week'
+                        ? 'Tente selecionar outra semana'
+                        : 'Você ainda não possui agendamentos'}
                 </p>
               </div>
             )}
