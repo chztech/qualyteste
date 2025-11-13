@@ -650,76 +650,91 @@ export default function AdminDashboard({
           </div>
           
           {/* Filtros */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 w-full lg:w-auto">
             {/* Filtro de Período */}
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
-              <select
-                value={filterPeriod}
-                onChange={(e) => setFilterPeriod(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-              >
-                <option value="day">Por Dia</option>
-                <option value="week">Por Semana</option>
-                <option value="month">Por Mês</option>
-              </select>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Período</span>
+              <div className="flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <select
+                  value={filterPeriod}
+                  onChange={(e) => setFilterPeriod(e.target.value as any)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                >
+                  <option value="day">Por Dia</option>
+                  <option value="week">Por Semana</option>
+                  <option value="month">Por Mês</option>
+                </select>
+              </div>
             </div>
 
             {/* Navegação de Data */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => navigateDate('prev')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              
-              <div className="text-center min-w-[200px]">
-                <div className="text-sm font-medium text-gray-900">
-                  {getFormattedPeriod()}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Navegação</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => navigateDate('prev')}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                
+                <div className="text-center min-w-[200px]">
+                  <div className="text-sm font-medium text-gray-900">
+                    {getFormattedPeriod()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {filterPeriod === 'day' ? 'Dia' : filterPeriod === 'week' ? 'Semana' : 'Mês'}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {filterPeriod === 'day' ? 'Dia' : filterPeriod === 'week' ? 'Semana' : 'Mês'}
-                </div>
+                
+                <button
+                  onClick={() => navigateDate('next')}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
-              
-              <button
-                onClick={() => navigateDate('next')}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
             </div>
 
             {/* Filtro de Empresa */}
-            <select
-              value={selectedCompany}
-              onChange={(e) => setSelectedCompany(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-            >
-              <option value="">Todas as Empresas</option>
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Empresa</span>
+              <select
+                value={selectedCompany}
+                onChange={(e) => setSelectedCompany(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full"
+              >
+                <option value="">Todas as Empresas</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <input
-              type="text"
-              placeholder="Buscar colaborador"
-              value={employeeSearch}
-              onChange={(e) => setEmployeeSearch(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full sm:w-48"
-            />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Colaborador</span>
+              <input
+                type="text"
+                placeholder="Buscar colaborador"
+                value={employeeSearch}
+                onChange={(e) => setEmployeeSearch(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-full"
+              />
+            </div>
 
             {/* Botão Hoje */}
-            <button
-              onClick={() => setSelectedDate(getCurrentDateString())}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              Hoje
-            </button>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Atalho</span>
+              <button
+                onClick={() => setSelectedDate(getCurrentDateString())}
+                className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Hoje
+              </button>
+            </div>
           </div>
         </div>
       </div>
