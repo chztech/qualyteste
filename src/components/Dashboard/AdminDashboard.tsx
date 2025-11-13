@@ -669,9 +669,9 @@ export default function AdminDashboard({
             </div>
 
             {/* Navegação de Data */}
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 sm:col-span-2">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Navegação</span>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <button
                   onClick={() => navigateDate('prev')}
                   className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -679,13 +679,16 @@ export default function AdminDashboard({
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 
-                <div className="text-center min-w-[200px]">
-                  <div className="text-sm font-medium text-gray-900">
+                <div className="flex-1 min-w-0 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-center">
+                  <p
+                    className="text-sm font-semibold text-gray-900 truncate"
+                    title={getFormattedPeriod()}
+                  >
                     {getFormattedPeriod()}
-                  </div>
-                  <div className="text-xs text-gray-500">
+                  </p>
+                  <p className="text-xs text-gray-500">
                     {filterPeriod === 'day' ? 'Dia' : filterPeriod === 'week' ? 'Semana' : 'Mês'}
-                  </div>
+                  </p>
                 </div>
                 
                 <button
