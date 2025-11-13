@@ -730,7 +730,7 @@ export default function AdminDashboard({
 
             {/* Botão Hoje */}
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide"></span>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide"> </span>
               <button
                 onClick={() => setSelectedDate(getCurrentDateString())}
                 className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
