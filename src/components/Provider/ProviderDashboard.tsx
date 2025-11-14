@@ -39,10 +39,9 @@ export default function ProviderDashboard({
     return appointments.filter(apt => apt.providerId === provider.id);
   };
 
-  // 🎯 FUNÇÃO CORRIGIDA: Obter agendamentos de hoje
+  // 🎯 FUNÇÃO CORRIGIDA: Obter agendamentos do dia selecionado
   const getTodayAppointments = () => {
-    const today = getCurrentDateString();
-    return getProviderAppointments().filter(apt => apt.date === today);
+    return getProviderAppointments().filter(apt => apt.date === selectedDate);
   };
 
   // 🎯 FUNÇÃO CORRIGIDA: Filtrar agendamentos por período
@@ -174,6 +173,7 @@ export default function ProviderDashboard({
             <Calendar className="w-8 h-8 text-blue-600" />
             <div>
               <p className="text-sm text-gray-600">Hoje</p>
+              <p className="text-xs text-gray-500">{formatDate(selectedDate)}</p>
               <p className="text-xl font-bold text-blue-600">{todayStats.total}</p>
             </div>
           </div>
