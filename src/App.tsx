@@ -1041,13 +1041,20 @@ const handleCompanyBookAppointment = async (
     }
   };
 
-  const handleUpdateAppointmentStatus = (
+  const handleUpdateAppointmentStatus = async (
     appointmentId: string,
     status: "confirmed" | "completed" | "cancelled"
   ) => {
-    setAppointments((prev) =>
-      prev.map((apt) => (apt.id === appointmentId ? { ...apt, status } : apt))
-    );
+    try {
+      await apiService.updateAppointment(appointmentId, { status });
+      setAppointments((prev) =>
+        prev.map((apt) => (apt.id === appointmentId ? { ...apt, status } : apt))
+      );
+      await loadInitialData({ roleOverride: currentUser?.role });
+    } catch (error) {
+      console.error("Erro ao atualizar status do agendamento:", error);
+      alert("N�o foi poss�vel atualizar o status do agendamento. Tente novamente.");
+    }
   };
 
   const getFilteredData = () => {
