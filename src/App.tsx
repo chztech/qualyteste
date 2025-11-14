@@ -1278,6 +1278,7 @@ const handleCompanyBookAppointment = async (
             appointments={filteredData.appointments}
             providers={providers}
             companies={companies}
+            services={services}
           />
         );
 
