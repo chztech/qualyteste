@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, Download, FileText, BarChart3, PieChart, TrendingUp, Users, Clock, CheckCircle, XCircle, AlertCircle, Filter, Building2 } from 'lucide-react';
 import { generatePDFReport, generateExcelReport } from '../../utils/reportGenerator';
 import { formatDate, getCurrentDateString, getMonthRange } from '../../utils/dateUtils';
@@ -7,6 +7,7 @@ interface ReportsPageProps {
   appointments: any[];
   providers: any[];
   companies: any[];
+  services: { id: string; name: string }[];
 }
 
 interface ReportFilters {
@@ -18,7 +19,7 @@ interface ReportFilters {
   reportType: 'general' | 'company-detailed';
 }
 
-export default function ReportsPage({ appointments, providers, companies }: ReportsPageProps) {
+export default function ReportsPage({ appointments, providers, companies, services }: ReportsPageProps) {
   const [filters, setFilters] = useState<ReportFilters>({
     startDate: '',
     endDate: '',
@@ -29,6 +30,37 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
   });
 
   const [filteredAppointments, setFilteredAppointments] = useState(appointments);
+  const DEFAULT_SERVICE_LABEL = 'Serviço não definido';
+
+  const resolveServiceName = (apt: any) => {
+    if (apt.serviceName) return apt.serviceName;
+    if (apt.service) return apt.service;
+    const serviceId = apt.serviceId || apt.service_id;
+    if (serviceId) {
+      const matchedService = services.find(service => service.id === serviceId);
+      if (matchedService) return matchedService.name;
+    }
+    return DEFAULT_SERVICE_LABEL;
+  };
+
+  const serviceOptions = useMemo(() => {
+    const names = new Set<string>();
+    services.forEach(service => {
+      if (service.name) {
+        names.add(service.name);
+      }
+    });
+    appointments.forEach(apt => {
+      const name = resolveServiceName(apt);
+      if (name) {
+        names.add(name);
+      }
+    });
+    if (names.size === 0) {
+      names.add(DEFAULT_SERVICE_LABEL);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [services, appointments]);
 
   // 🎯 INICIALIZAR COM DADOS DO MÊS ATUAL
   useEffect(() => {
@@ -55,7 +87,7 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
       filtered = filtered.filter(apt => apt.companyId === filters.company);
     }
     if (filters.service) {
-      filtered = filtered.filter(apt => apt.service === filters.service);
+      filtered = filtered.filter(apt => resolveServiceName(apt) === filters.service);
     }
     if (filters.status) {
       filtered = filtered.filter(apt => apt.status === filters.status);
@@ -90,10 +122,15 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
     }, {} as Record<string, number>);
 
     // Gráfico de Serviços
-    const servicesData = filteredAppointments.reduce((acc, apt) => {
-      acc[apt.service] = (acc[apt.service] || 0) + 1;
+    const servicesData = serviceOptions.reduce((acc, serviceName) => {
+      acc[serviceName] = 0;
       return acc;
     }, {} as Record<string, number>);
+
+    filteredAppointments.forEach(apt => {
+      const name = resolveServiceName(apt);
+      servicesData[name] = (servicesData[name] || 0) + 1;
+    });
 
     // Gráfico de Empresas
     const companiesData = filteredAppointments.reduce((acc, apt) => {
@@ -127,7 +164,7 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
         totalDuration: companyAppointments.reduce((sum, apt) => sum + apt.duration, 0),
         employees: new Set(companyAppointments.map(apt => apt.employeeId).filter(Boolean)),
         providers: new Set(companyAppointments.map(apt => apt.providerId)),
-        services: new Set(companyAppointments.map(apt => apt.service))
+        services: new Set(companyAppointments.map(apt => resolveServiceName(apt)))
       };
 
       return {
@@ -207,12 +244,17 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
   };
 
   const getTopServices = () => {
-    const services = filteredAppointments.reduce((acc, apt) => {
-      acc[apt.service] = (acc[apt.service] || 0) + 1;
+    const serviceCounts = serviceOptions.reduce((acc, serviceName) => {
+      acc[serviceName] = 0;
       return acc;
     }, {} as Record<string, number>);
 
-    return Object.entries(services)
+    filteredAppointments.forEach(apt => {
+      const name = resolveServiceName(apt);
+      serviceCounts[name] = (serviceCounts[name] || 0) + 1;
+    });
+
+    return Object.entries(serviceCounts)
       .map(([service, count]) => ({ service, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -241,10 +283,6 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
       completed: data.completed,
       completionRate: data.total > 0 ? Math.round((data.completed / data.total) * 100) : 0
     }));
-  };
-
-  const getUniqueServices = () => {
-    return [...new Set(filteredAppointments.map(apt => apt.service))];
   };
 
   const getStatusIcon = (status: string) => {
@@ -455,8 +493,8 @@ export default function ReportsPage({ appointments, providers, companies }: Repo
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Todos</option>
-              {getUniqueServices().map(service => (
-                <option key={service} value={service}>{service}</option>
+              {serviceOptions.map(serviceName => (
+                <option key={serviceName} value={serviceName}>{serviceName}</option>
               ))}
             </select>
           </div>
